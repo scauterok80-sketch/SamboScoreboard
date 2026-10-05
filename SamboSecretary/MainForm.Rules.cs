@@ -105,18 +105,28 @@ public sealed partial class MainForm{
             }
         }
 
-        var allIds=db.Athletes(cid).Select(a=>a.Id).ToList();var disqualified=allIds.Where(id=>CompetitionRules.IsDisqualified(id,bouts)).ToHashSet();var remaining=allIds.Where(id=>!placed.Contains(id)&&!disqualified.Contains(id)).ToList();
+        var allIds=db.Athletes(cid).Select(a=>a.Id).ToList();
+        var disqualified=allIds.Where(id=>CompetitionRules.IsDisqualified(id,bouts)).ToHashSet();
+        var remaining=allIds.Where(id=>!placed.Contains(id)&&!disqualified.Contains(id)).ToList();
         int nextPlace=placed.Count+1;
-        var lossScore=remaining.ToDictionary(id=>id,id=>{
-            var losses=bouts.Where(b=>b.Status=="Завершён"&&(b.RedId==id||b.BlueId==id)&&b.WinnerId!=id).ToList();
-            var consolation=losses.Where(b=>b.Stage.StartsWith("Утешение")).OrderByDescending(b=>b.BoutNo).FirstOrDefault();
-            if(consolation!=null)return 100000+consolation.BoutNo;
-            var main=losses.OrderByDescending(b=>CompetitionRules.StageOrder(b.Stage)).ThenByDescending(b=>b.BoutNo).FirstOrDefault();
-            return main==null?0:CompetitionRules.StageOrder(main.Stage)*1000+main.BoutNo;
+
+        if(cat.Repechage!="Без утешительных встреч"){
+            var depths=CompetitionRules.ConsolationLossDepth(bouts);
+            foreach(var tier in remaining.Where(depths.ContainsKey).GroupBy(id=>depths[id]).OrderBy(g=>g.Key)){
+                foreach(var id in tier){db.SavePlacement(cid,id,nextPlace,$"Выбыл в утешительной ветке, уровень {tier.Key}");placed.Add(id);}
+                nextPlace+=tier.Count();
+            }
+            remaining=remaining.Where(id=>!placed.Contains(id)).ToList();
+        }
+
+        var mainLossRound=remaining.ToDictionary(id=>id,id=>{
+            var loss=bouts.Where(b=>b.Status=="Завершён"&&(b.RedId==id||b.BlueId==id)&&b.WinnerId!=id&&CompetitionRules.StageOrder(b.Stage)>0)
+                .OrderByDescending(b=>CompetitionRules.StageOrder(b.Stage)).FirstOrDefault();
+            return loss==null?0:CompetitionRules.StageOrder(loss.Stage);
         });
-        foreach(var g in remaining.GroupBy(id=>lossScore[id]).OrderByDescending(g=>g.Key)){
-            foreach(var id in g)db.SavePlacement(cid,id,nextPlace,g.Key>=100000?"Выбыл в утешительной ветке":"Выбыл в основной сетке");
-            nextPlace+=g.Count();
+        foreach(var tier in remaining.GroupBy(id=>mainLossRound[id]).OrderByDescending(g=>g.Key)){
+            foreach(var id in tier)db.SavePlacement(cid,id,nextPlace,tier.Key>0?"Выбыл в одном круге основной сетки":"Не имеет завершённой встречи для ранжирования");
+            nextPlace+=tier.Count();
         }
         db.Audit($"Итоговые места олимпийской категории {cid} рассчитаны");
     }

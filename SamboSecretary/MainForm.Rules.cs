@@ -34,7 +34,11 @@ public sealed partial class MainForm{
     }
 
     List<long> ResolveRanking(long cid,IReadOnlyCollection<long> ids,IReadOnlyCollection<BoutRuleRow> bouts,string scope){
-        var rr=CompetitionRules.RankRoundRobin(ids,bouts);var order=rr.Ordered.ToList();
+        var disqualified=ids.Where(id=>CompetitionRules.IsDisqualified(id,bouts)).ToHashSet();
+        var eligible=ids.Where(id=>!disqualified.Contains(id)).ToList();
+        var validBouts=bouts.Where(b=>(!b.RedId.HasValue||!disqualified.Contains(b.RedId.Value))&&(!b.BlueId.HasValue||!disqualified.Contains(b.BlueId.Value))).ToList();
+        foreach(var id in disqualified)db.Audit($"Спортсмен {id} исключён из итогового места ({scope}) из-за дисквалификации");
+        var rr=CompetitionRules.RankRoundRobin(eligible,validBouts);var order=rr.Ordered.ToList();
         foreach(var tied in rr.Unresolved){
             var athletes=db.Athletes(cid).Where(a=>tied.Contains(a.Id)).ToList();
             using var d=new RankingOverrideDialog(athletes,rr.Metrics);
@@ -101,7 +105,7 @@ public sealed partial class MainForm{
             }
         }
 
-        var allIds=db.Athletes(cid).Select(a=>a.Id).ToList();var remaining=allIds.Where(id=>!placed.Contains(id)).ToList();
+        var allIds=db.Athletes(cid).Select(a=>a.Id).ToList();var disqualified=allIds.Where(id=>CompetitionRules.IsDisqualified(id,bouts)).ToHashSet();var remaining=allIds.Where(id=>!placed.Contains(id)&&!disqualified.Contains(id)).ToList();
         int nextPlace=placed.Count+1;
         var lossScore=remaining.ToDictionary(id=>id,id=>{
             var losses=bouts.Where(b=>b.Status=="Завершён"&&(b.RedId==id||b.BlueId==id)&&b.WinnerId!=id).ToList();

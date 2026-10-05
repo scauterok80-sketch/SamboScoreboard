@@ -5,7 +5,7 @@ namespace SamboSecretary;
 
 public record Tournament(long Id,string Name,string Place,string StartDate,string EndDate,int Mats,string ChiefReferee,string ChiefSecretary,string TeamScheme);
 public record CategoryRow(long Id,string Discipline,string Gender,string AgeGroup,string WeightCategory,string System,string Repechage,string DrawMode,bool DrawApproved,string Status);
-public record Athlete(long Id,string FullName,string BirthDate,string Gender,string Region,string Organization,string Team,string Coach,string Rank,string Discipline,string AgeGroup,string WeightCategory,double? DeclaredWeight,double? ActualWeight,string Status,long? CategoryId);
+public record Athlete(long Id,string FullName,string BirthDate,string Gender,string Region,string Organization,string Team,string Coach,string Rank,string Discipline,string AgeGroup,string WeightCategory,double? DeclaredWeight,double? ActualWeight,string Status,long? CategoryId,string StatusReason="");
 public record JudgeRow(long Id,string Name,string Region,string Category,string Role);
 public record JudgeAssignmentRow(long Id,long CategoryId,long JudgeId,string JudgeName,int Mat,string Role);
 public record BoutRow(long Id,long CategoryId,int BoutNo,int DisplayNo,string Stage,long? RedId,string RedName,long? BlueId,string BlueName,int Mat,string ScheduledTime,string Status,int? RedScore,int? BlueScore,long? WinnerId,string WinnerName,string Reason,string Judges);
@@ -66,7 +66,7 @@ public sealed class Database {
     void EnsureAthleteColumns(SqliteConnection c){
         var required=new Dictionary<string,string>{
             ["birth_date"]="TEXT",["region"]="TEXT",["organization"]="TEXT",["coach"]="TEXT",["rank"]="TEXT",
-            ["declared_weight"]="REAL",["category_id"]="INTEGER"
+            ["declared_weight"]="REAL",["category_id"]="INTEGER",["status_reason"]="TEXT DEFAULT ''"
         };
         var existing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         using(var q=c.CreateCommand()){ q.CommandText="PRAGMA table_info(athletes)"; using var r=q.ExecuteReader(); while(r.Read()) existing.Add(r.GetString(1)); }
@@ -179,11 +179,11 @@ public sealed class Database {
         using var c=Open();using(var q=c.CreateCommand()){q.CommandText="SELECT COUNT(*) FROM bouts WHERE red_id=$id OR blue_id=$id OR winner_id=$id";q.Parameters.AddWithValue("$id",id);if(Convert.ToInt32(q.ExecuteScalar())>0)return false;}
         using(var q=c.CreateCommand()){q.CommandText="DELETE FROM athletes WHERE id=$id";q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();}Audit($"Удалён спортсмен {id}");return true;
     }
-    public void UpdateAthleteStatus(long id,string status){using var c=Open();EnsureEligibilityUnlocked(c,id);using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET status=$s WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Статус спортсмена {id}: {status}");}
+    public void UpdateAthleteStatus(long id,string status,string reason=""){using var c=Open();EnsureEligibilityUnlocked(c,id);using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET status=$s,status_reason=$r WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$r",reason??"");q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Статус спортсмена {id}: {status}"+(string.IsNullOrWhiteSpace(reason)?"":$"; причина: {reason}"));}
     public void SetOperationalAthleteStatus(long id,string status){
-        using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET status=$s WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Соревновательный статус спортсмена {id}: {status}");
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET status=$s,status_reason=$r WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$r",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Соревновательный статус спортсмена {id}: {status}");
     }
-    public void SetWeigh(long id,double kg,string status="Допущен"){using var c=Open();EnsureEligibilityUnlocked(c,id);using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET actual_weight=$w,status=$s WHERE id=$id";q.Parameters.AddWithValue("$w",kg);q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Взвешивание {id}: {kg} кг, {status}");}
+    public void SetWeigh(long id,double kg,string status="Допущен",string reason=""){using var c=Open();EnsureEligibilityUnlocked(c,id);using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET actual_weight=$w,status=$s,status_reason=$r WHERE id=$id";q.Parameters.AddWithValue("$w",kg);q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$r",reason??"");q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Взвешивание {id}: {kg} кг, {status}"+(string.IsNullOrWhiteSpace(reason)?"":$"; причина: {reason}"));}
     public void AssignCategory(long id,long? categoryId){
         using var c=Open();var old=AthleteCompetitionFields(c,id);
         if(old.CategoryId==categoryId)return;
@@ -194,11 +194,11 @@ public sealed class Database {
     public List<Athlete> Athletes(long? categoryId=null){
         using var c=Open();using var q=c.CreateCommand();
         q.CommandText=@"SELECT id,full_name,COALESCE(birth_date,''),COALESCE(gender,''),COALESCE(region,''),COALESCE(organization,''),COALESCE(team,''),COALESCE(coach,''),COALESCE(rank,''),
-                       COALESCE(discipline,''),COALESCE(age_group,''),COALESCE(weight_category,''),declared_weight,actual_weight,COALESCE(status,''),category_id
+                       COALESCE(discipline,''),COALESCE(age_group,''),COALESCE(weight_category,''),declared_weight,actual_weight,COALESCE(status,''),category_id,COALESCE(status_reason,'')
                        FROM athletes "+(categoryId.HasValue?"WHERE category_id=$cid ":"")+"ORDER BY full_name";
         if(categoryId.HasValue)q.Parameters.AddWithValue("$cid",categoryId.Value);
         using var r=q.ExecuteReader();var x=new List<Athlete>();
-        while(r.Read())x.Add(new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetString(5),r.GetString(6),r.GetString(7),r.GetString(8),r.GetString(9),r.GetString(10),r.GetString(11),r.IsDBNull(12)?null:r.GetDouble(12),r.IsDBNull(13)?null:r.GetDouble(13),r.GetString(14),r.IsDBNull(15)?null:r.GetInt64(15)));
+        while(r.Read())x.Add(new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetString(5),r.GetString(6),r.GetString(7),r.GetString(8),r.GetString(9),r.GetString(10),r.GetString(11),r.IsDBNull(12)?null:r.GetDouble(12),r.IsDBNull(13)?null:r.GetDouble(13),r.GetString(14),r.IsDBNull(15)?null:r.GetInt64(15),r.GetString(16)));
         return x;
     }
 

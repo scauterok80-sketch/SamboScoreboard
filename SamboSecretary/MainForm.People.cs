@@ -66,7 +66,7 @@ public sealed partial class MainForm{
         using var d=new CategoryDialog();d.Discipline.SelectedItem=x.Discipline;d.Gender.SelectedItem=x.Gender;d.Age.Text=x.AgeGroup;d.Weight.Text=x.WeightCategory;
         if(d.SystemBox.Items.Contains(x.System))d.SystemBox.SelectedItem=x.System;if(d.Repechage.Items.Contains(x.Repechage))d.Repechage.SelectedItem=x.Repechage;if(d.DrawModeBox.Items.Contains(x.DrawMode))d.DrawModeBox.SelectedItem=x.DrawMode;
         if(d.ShowDialog(this)!=DialogResult.OK)return;
-        db.UpdateCategory(id.Value,d.Discipline.Text,d.Gender.Text,d.Age.Text.Trim(),d.Weight.Text.Trim(),d.SystemBox.Text,d.Repechage.Text,d.DrawModeBox.Text);AutoBackup();ReloadAll();
+        UiGuard(()=>{db.UpdateCategory(id.Value,d.Discipline.Text,d.Gender.Text,d.Age.Text.Trim(),d.Weight.Text.Trim(),d.SystemBox.Text,d.Repechage.Text,d.DrawModeBox.Text);AutoBackup();ReloadAll();},"Категория не изменена");
     }
 
     void ReloadCategories(){

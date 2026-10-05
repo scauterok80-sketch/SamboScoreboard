@@ -13,6 +13,7 @@ public sealed partial class MainForm{
         bar.Controls.Add(new Label{Text="Система:",AutoSize=true,Margin=new Padding(10,12,3,0)});bar.Controls.Add(drawSystem);
         bar.Controls.Add(new Label{Text="Жеребьёвка:",AutoSize=true,Margin=new Padding(10,12,3,0)});bar.Controls.Add(drawMode);
         bar.Controls.Add(new Label{Text="Утешительные:",AutoSize=true,Margin=new Padding(10,12,3,0)});bar.Controls.Add(drawRepechage);
+        bar.Controls.Add(separateTeams);
         bar.Controls.Add(Btn("Сформировать",GenerateDrawClick));bar.Controls.Add(Btn("Утвердить",(s,e)=>{var id=SelectedCategory(drawCategory);if(id.HasValue){db.ApproveDraw(id.Value,true);ReloadAll();}}));
         bar.Controls.Add(Btn("Разблокировать",(s,e)=>{var id=SelectedCategory(drawCategory);if(id.HasValue&&MessageBox.Show("Разблокировать жеребьёвку? Действие будет записано в журнал.","Подтверждение",MessageBoxButtons.YesNo)==DialogResult.Yes){db.ApproveDraw(id.Value,false);ReloadAll();}}));
         drawCategory.SelectedIndexChanged+=(s,e)=>LoadDrawSettings();

@@ -70,12 +70,14 @@ public sealed partial class MainForm{
         long champion=final.WinnerId!.Value, silver=final.RedId==champion?final.BlueId!.Value:final.RedId!.Value;
         long bronzeA=semis[0].RedId==semis[0].WinnerId?semis[0].BlueId!.Value:semis[0].RedId!.Value;
         long bronzeB=semis[1].RedId==semis[1].WinnerId?semis[1].BlueId!.Value:semis[1].RedId!.Value;
-        db.ClearPlacements(cid);db.SavePlacement(cid,champion,1,"Победитель финала");db.SavePlacement(cid,silver,2,"Финалист");
-        db.SavePlacement(cid,bronzeA,3,"Проигравший полуфинал");db.SavePlacement(cid,bronzeB,3,"Проигравший полуфинал");
+        db.ClearPlacements(cid);db.SavePlacement(cid,champion,1,"Победитель финала");
+        if(!CompetitionRules.IsDisqualified(silver,bouts))db.SavePlacement(cid,silver,2,"Финалист");else db.Audit($"Финалист {silver} не получает место из-за дисквалификации");
+        if(!CompetitionRules.IsDisqualified(bronzeA,bouts))db.SavePlacement(cid,bronzeA,3,"Проигравший полуфинал");else db.Audit($"Полуфиналист {bronzeA} не получает место из-за дисквалификации");
+        if(!CompetitionRules.IsDisqualified(bronzeB,bouts))db.SavePlacement(cid,bronzeB,3,"Проигравший полуфинал");else db.Audit($"Полуфиналист {bronzeB} не получает место из-за дисквалификации");
         int place=5;int max=Math.Max(ar.Count,br.Count);
         for(int i=2;i<max;i++){
             var tier=new List<long>();if(i<ar.Count)tier.Add(ar[i]);if(i<br.Count)tier.Add(br[i]);
-            foreach(var id in tier)db.SavePlacement(cid,id,place,$"Место {i+1} в подгруппе");
+            foreach(var id in tier.Where(id=>!CompetitionRules.IsDisqualified(id,bouts)))db.SavePlacement(cid,id,place,$"Место {i+1} в подгруппе");
             place+=tier.Count;
         }
         db.Audit($"Итоговые места смешанной категории {cid} рассчитаны");

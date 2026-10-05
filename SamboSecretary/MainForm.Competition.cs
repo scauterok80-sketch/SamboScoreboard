@@ -16,7 +16,7 @@ public sealed partial class MainForm{
         bar.Controls.Add(separateTeams);
         bar.Controls.Add(Btn("Сформировать / пережеребьевать",GenerateDrawClick));
         bar.Controls.Add(Btn("Переставить вручную",(s,e)=>{if(drawMode.Items.Contains("Ручная"))drawMode.SelectedItem="Ручная";GenerateDrawClick(s,e);}));
-        bar.Controls.Add(Btn("Утвердить",(s,e)=>{var id=SelectedCategory(drawCategory);if(id.HasValue){db.ApproveDraw(id.Value,true);AutoBackup();ReloadAll();}}));
+        bar.Controls.Add(Btn("Утвердить",(s,e)=>{var id=SelectedCategory(drawCategory);if(!id.HasValue)return;if(db.DrawPositions(id.Value).Count<2){MessageBox.Show("Сначала сформируйте и проверьте жеребьёвку.");return;}db.ApproveDraw(id.Value,true);AutoBackup();ReloadAll();}));
         bar.Controls.Add(Btn("Разблокировать",(s,e)=>{var id=SelectedCategory(drawCategory);if(id.HasValue&&MessageBox.Show("Разблокировать жеребьёвку? Действие будет записано в журнал.","Подтверждение",MessageBoxButtons.YesNo)==DialogResult.Yes){db.ApproveDraw(id.Value,false);ReloadAll();}}));
         drawCategory.SelectedIndexChanged+=(s,e)=>LoadDrawSettings();
         page.Controls.Add(drawGrid);page.Controls.Add(bar);
@@ -127,8 +127,14 @@ public sealed partial class MainForm{
             return new{ID=x.Id,Номер=x.DisplayNo,Порядок_сетки=x.BoutNo,План=x.ScheduledTime,Этап=x.Stage,Красный=x.RedName,Синий=x.BlueName,Ковер=x.Mat,Статус=x.Status,Счет_красного=x.RedScore,Счет_синего=x.BlueScore,Классификация=r.ResultCode,Время=$"{r.DurationSeconds/60}:{r.DurationSeconds%60:00}",Победитель=x.WinnerName,Причина=x.Reason,Судьи=x.Judges};
         }).ToList();
     }
+    bool CompetitionUnlocked(long cid){
+        var cat=db.Categories().FirstOrDefault(x=>x.Id==cid);
+        if(cat==null||!cat.DrawApproved){MessageBox.Show("Сначала утвердите жеребьёвку категории. До утверждения сетка считается предварительной.","Категория не запущена",MessageBoxButtons.OK,MessageBoxIcon.Warning);return false;}
+        return true;
+    }
+
     void ChangeBoutStateClick(object? s,EventArgs e){
-        var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue)return;
+        var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue||!CompetitionUnlocked(cid.Value))return;
         var b=db.Bouts(cid.Value).FirstOrDefault(x=>x.Id==bid.Value);if(b==null)return;
         if(b.Status=="Завершён"){MessageBox.Show("Завершённый поединок изменяется через «Внести результат», чтобы сохранить корректировку в журнале.");return;}
         var status=Microsoft.VisualBasic.Interaction.InputBox("Статус: Ожидает / Готов / Вызван / Идёт","Статус поединка",b.Status);
@@ -144,7 +150,7 @@ public sealed partial class MainForm{
     }
 
     void EnterResultClick(object? s,EventArgs e){
-        var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue)return;
+        var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue||!CompetitionUnlocked(cid.Value))return;
         var b=db.Bouts(cid.Value).FirstOrDefault(x=>x.Id==bid.Value);if(b==null||!b.RedId.HasValue||!b.BlueId.HasValue)return;
         var oldRule=db.BoutsByRuleId(b.Id);
         var assigned=db.JudgeAssignments(cid.Value).Where(x=>x.Mat==b.Mat).ToList();
@@ -192,11 +198,14 @@ public sealed partial class MainForm{
     }
 
     void AdvanceStageClick(object? s,EventArgs e){
-        var cid=SelectedCategory(boutCategory);if(!cid.HasValue)return;var cat=db.Categories().First(x=>x.Id==cid.Value);
-        if(cat.System=="Смешанная")AdvanceMixed(cid.Value);
-        else if(cat.System=="Олимпийская")AdvanceOlympic(cid.Value);
-        else MessageBox.Show("Для круговой системы следующий этап не создаётся: итог определяется по таблице результатов.");
-        ReloadAll();
+        var cid=SelectedCategory(boutCategory);if(!cid.HasValue||!CompetitionUnlocked(cid.Value))return;var cat=db.Categories().First(x=>x.Id==cid.Value);
+        try{
+            if(cat.System=="Смешанная")AdvanceMixed(cid.Value);
+            else if(cat.System=="Олимпийская")AdvanceOlympic(cid.Value);
+            else MessageBox.Show("Для круговой системы следующий этап не создаётся: итог определяется по таблице результатов.");
+            ReloadAll();
+        }catch(OperationCanceledException){MessageBox.Show("Переход остановлен: требуется решение ГСК по спорному ранжированию.");}
+        catch(Exception ex){MessageBox.Show(ex.Message,"Следующий этап не сформирован",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
     }
 
     void AdvanceMixed(long cid){

@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+using System.Linq;
 using ClosedXML.Excel;
 using Xunit;
 using SamboSecretary;

@@ -27,6 +27,7 @@ public sealed partial class MainForm{
             else if(c.System=="Смешанная")FinalizeMixed(cid.Value);
             else if(c.System=="Олимпийская")FinalizeOlympic(cid.Value);
             else{MessageBox.Show("Сначала сформируйте жеребьёвку и выберите систему.");return;}
+            db.SetCategoryStatus(cid.Value,"Завершена");
             AutoBackup();
             ReloadAll();MessageBox.Show("Итоговые места рассчитаны и сохранены.");
         }catch(OperationCanceledException){MessageBox.Show("Расчёт мест отменён: требуется решение ГСК.");}

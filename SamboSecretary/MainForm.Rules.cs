@@ -165,6 +165,17 @@ public sealed partial class MainForm{
         }
     }
 
+    IEnumerable<string> BlankCategoryLines(long cid){
+        var cat=db.Categories().First(x=>x.Id==cid);var lines=new List<string>();lines.AddRange(HeaderLines());
+        lines.Add($"{cat.Discipline}; {cat.Gender}; {cat.AgeGroup}; {cat.WeightCategory}; система: {cat.System}; утешительные: {cat.Repechage}");
+        lines.Add("");lines.Add("СОСТАВ КАТЕГОРИИ:");
+        var athletes=db.Athletes(cid);for(int i=0;i<athletes.Count;i++)lines.Add($"{i+1}. {athletes[i].FullName} | {athletes[i].Team} | вес ______ | допуск ______");
+        lines.Add("");lines.Add("ХОД СОРЕВНОВАНИЙ:");
+        int count=Math.Max(8,db.Bouts(cid).Count);for(int i=1;i<=count;i++)lines.Add($"№{i} ____________________ — ____________________  счёт ______  победитель ____________________");
+        lines.Add("");lines.Add("ИТОГОВЫЕ МЕСТА:");for(int i=1;i<=Math.Min(8,Math.Max(4,athletes.Count));i++)lines.Add($"{i} место: __________________________________");
+        return lines;
+    }
+
     IEnumerable<string> TeamStandingLines(){
         var all=db.Categories().SelectMany(c=>db.Placements(c.Id)).Where(p=>!string.IsNullOrWhiteSpace(p.Team)).ToList();
         var rows=all.GroupBy(p=>p.Team).Select(g=>new{Team=g.Key,Gold=g.Count(x=>x.Place==1),Silver=g.Count(x=>x.Place==2),Bronze=g.Count(x=>x.Place==3),Fifth=g.Count(x=>x.Place==5)})

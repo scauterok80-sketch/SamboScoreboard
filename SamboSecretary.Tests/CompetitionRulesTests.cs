@@ -66,4 +66,41 @@ public class CompetitionRulesTests{
         Assert.True(CompetitionRules.StageOrder("1/4")<CompetitionRules.StageOrder("Полуфинал"));
         Assert.True(CompetitionRules.StageOrder("Полуфинал")<CompetitionRules.StageOrder("Финал"));
     }
+
+    [Fact]
+    public void ActivityAtZeroZeroProducesMinimalAdvantage(){
+        var x=CompetitionRules.ClassificationFor("",0,0,true,"По активности");
+        Assert.Equal("2:0",x.Code);Assert.Equal(2,x.Red);Assert.Equal(0,x.Blue);
+    }
+
+    [Fact]
+    public void NoShowDoesNotAutomaticallyBanConsolationButDisqualificationDoes(){
+        var noShow=new BoutRuleRow(1,1,1,"1/8",1,2,"Завершён",0,0,1,"4:0",4,0,0,false,0,0,0,0,0,0,"Неявка / опоздание — снятие со схватки");
+        var dq=noShow with{Id=2,Reason="Дисквалификация с соревнований"};
+        Assert.True(CompetitionRules.CanContinueAfterLoss(noShow,2));
+        Assert.False(CompetitionRules.CanContinueAfterLoss(dq,2));
+    }
+
+    [Fact]
+    public void ConsolationLosersShareDepthTiers(){
+        var bouts=new[]{
+            B(1,10,1,2,1,"3:0",3,0,4,0,240,false,"Утешение Ф-A / шаг 1"),
+            B(2,11,1,3,1,"3:0",3,0,4,0,240,false,"Утешение Ф-A / шаг 2"),
+            B(3,12,4,5,4,"3:0",3,0,4,0,240,false,"Утешение Ф-B / шаг 1"),
+            B(4,13,4,6,4,"3:0",3,0,4,0,240,false,"Утешение Ф-B / шаг 2")
+        };
+        var d=CompetitionRules.ConsolationLossDepth(bouts);
+        Assert.Equal(2,d[2]);Assert.Equal(1,d[3]);Assert.Equal(2,d[5]);Assert.Equal(1,d[6]);
+    }
+
+    [Fact]
+    public void SemifinalistConsolationMergeIsClosestTier(){
+        var bouts=new[]{
+            B(1,10,1,2,1,"3:0",3,0,4,0,240,false,"Утешение ПФ-A1 / шаг 1"),
+            B(2,11,3,4,3,"3:0",3,0,4,0,240,false,"Утешение ПФ-A2 / шаг 1"),
+            B(3,12,1,3,1,"3:0",3,0,4,0,240,false,"Утешение группа A")
+        };
+        var d=CompetitionRules.ConsolationLossDepth(bouts);
+        Assert.Equal(2,d[2]);Assert.Equal(2,d[4]);Assert.Equal(1,d[3]);
+    }
 }

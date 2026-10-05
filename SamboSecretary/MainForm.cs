@@ -41,7 +41,7 @@ public sealed partial class MainForm:Form{
     TabPage Page(string title){var p=new TabPage(title);tabs.TabPages.Add(p);return p;}
 
     void ReloadAll(){
-        ReloadCategories();ReloadAthletes();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadDraw();ReloadBouts();ReloadResults();ReloadAudit();
+        ReloadCategories();ReloadAthletes();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadJudgeAssignments();ReloadDraw();ReloadBouts();ReloadResults();ReloadAudit();
     }
 
     void ReloadCategoryChoices(){
@@ -52,7 +52,7 @@ public sealed partial class MainForm:Form{
             if(old.HasValue){for(int i=0;i<box.Items.Count;i++)if(((CategoryChoice)box.Items[i]).Id==old){box.SelectedIndex=i;return;}}
             if(box.Items.Count>0)box.SelectedIndex=0;
         }
-        Fill(assignCategory);Fill(drawCategory);Fill(boutCategory);Fill(resultCategory);
+        Fill(assignCategory);Fill(drawCategory);Fill(boutCategory);Fill(resultCategory);Fill(judgeAssignmentCategory);
     }
 
     long? SelectedCategory(ComboBox box)=>(box.SelectedItem as CategoryChoice)?.Id;

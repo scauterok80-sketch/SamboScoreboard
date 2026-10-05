@@ -93,6 +93,14 @@ public sealed class Database {
         using var c=Open(); using var q=c.CreateCommand(); q.CommandText="SELECT id,name,place,start_date,end_date,mats,chief_referee,chief_secretary FROM tournament WHERE id=1";
         using var r=q.ExecuteReader(); r.Read(); return new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetInt32(5),r.GetString(6),r.GetString(7));
     }
+    public void ResetForNewTournament(){
+        using var c=Open();using var tx=c.BeginTransaction();
+        foreach(var table in new[]{"judge_assignments","placements","bouts","draw_positions","judges","athletes","categories","audit"}){
+            using var q=c.CreateCommand();q.Transaction=tx;q.CommandText=$"DELETE FROM {table}";q.ExecuteNonQuery();
+        }
+        using(var q=c.CreateCommand()){q.Transaction=tx;q.CommandText="UPDATE tournament SET name='',place='',start_date='',end_date='',mats=1,chief_referee='',chief_secretary='' WHERE id=1";q.ExecuteNonQuery();}
+        tx.Commit();Audit("Создан новый турнир");
+    }
     public void SaveTournament(string name,string place,string start,string end,int mats,string chiefReferee,string chiefSecretary){
         using var c=Open(); using var q=c.CreateCommand();
         q.CommandText=@"UPDATE tournament SET name=$n,place=$p,start_date=$s,end_date=$e,mats=$m,chief_referee=$cr,chief_secretary=$cs WHERE id=1";

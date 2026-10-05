@@ -28,7 +28,7 @@ public sealed partial class MainForm:Form{
     public MainForm(){
         Text="Самбо-секретарь 2.0";WindowState=FormWindowState.Maximized;MinimumSize=new Size(1100,700);
         db=new Database(Path.Combine(root,"sambo.db"));
-        BuildTournamentTab();BuildCategoriesTab();BuildAthletesTab();BuildWeighTab();BuildJudgesTab();BuildDrawTab();BuildBoutsTab();BuildDocumentsTab();BuildAuditTab();
+        BuildTournamentTab();BuildCategoriesTab();BuildAthletesTab();BuildWeighTab();BuildJudgesTab();BuildDrawTab();BuildBoutsTab();BuildResultsTab();BuildDocumentsTab();BuildAuditTab();
         Controls.Add(tabs);LoadTournament();ReloadAll();
     }
 
@@ -41,7 +41,7 @@ public sealed partial class MainForm:Form{
     TabPage Page(string title){var p=new TabPage(title);tabs.TabPages.Add(p);return p;}
 
     void ReloadAll(){
-        ReloadCategories();ReloadAthletes();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadDraw();ReloadBouts();ReloadAudit();
+        ReloadCategories();ReloadAthletes();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadDraw();ReloadBouts();ReloadResults();ReloadAudit();
     }
 
     void ReloadCategoryChoices(){
@@ -52,7 +52,7 @@ public sealed partial class MainForm:Form{
             if(old.HasValue){for(int i=0;i<box.Items.Count;i++)if(((CategoryChoice)box.Items[i]).Id==old){box.SelectedIndex=i;return;}}
             if(box.Items.Count>0)box.SelectedIndex=0;
         }
-        Fill(assignCategory);Fill(drawCategory);Fill(boutCategory);
+        Fill(assignCategory);Fill(drawCategory);Fill(boutCategory);Fill(resultCategory);
     }
 
     long? SelectedCategory(ComboBox box)=>(box.SelectedItem as CategoryChoice)?.Id;

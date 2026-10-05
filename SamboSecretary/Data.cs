@@ -150,7 +150,11 @@ public sealed class Database {
         using var c=Open(); using var q=c.CreateCommand(); q.CommandText="UPDATE categories SET system=$s,repechage=$r,draw_mode=$m WHERE id=$id";
         q.Parameters.AddWithValue("$s",system);q.Parameters.AddWithValue("$r",repechage);q.Parameters.AddWithValue("$m",drawMode);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();
     }
-    public void ApproveDraw(long id,bool approved){ using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE categories SET draw_approved=$a,status=$s WHERE id=$id";q.Parameters.AddWithValue("$a",approved?1:0);q.Parameters.AddWithValue("$s",approved?"Жеребьёвка утверждена":"Подготовка");q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"{(approved?"Утверждена":"Разблокирована")} жеребьёвка категории {id}");}
+    public void ApproveDraw(long id,bool approved){
+        using var c=Open();
+        if(!approved){using var chk=c.CreateCommand();chk.CommandText="SELECT COUNT(*) FROM bouts WHERE category_id=$id AND status='Завершён'";chk.Parameters.AddWithValue("$id",id);if(Convert.ToInt32(chk.ExecuteScalar())>0)throw new InvalidOperationException("Нельзя разблокировать жеребьёвку после проведения поединков.");}
+        using var q=c.CreateCommand();q.CommandText="UPDATE categories SET draw_approved=$a,status=$s WHERE id=$id";q.Parameters.AddWithValue("$a",approved?1:0);q.Parameters.AddWithValue("$s",approved?"Жеребьёвка утверждена":"Подготовка");q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"{(approved?"Утверждена":"Разблокирована")} жеребьёвка категории {id}");
+    }
     public List<CategoryRow> Categories(){
         using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT id,discipline,gender,age_group,weight_category,system,repechage,draw_mode,draw_approved,status FROM categories ORDER BY discipline,gender,age_group,weight_category";
         using var r=q.ExecuteReader();var x=new List<CategoryRow>();while(r.Read())x.Add(new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetString(5),r.GetString(6),r.GetString(7),r.GetInt32(8)!=0,r.GetString(9)));return x;

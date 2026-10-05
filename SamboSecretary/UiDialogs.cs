@@ -93,6 +93,7 @@ public sealed class ImportMappingDialog:Form{
 public sealed class ResultDialog:Form{
     public readonly NumericUpDown RedScore=new(){Minimum=0,Maximum=999},BlueScore=new(){Minimum=0,Maximum=999};
     public readonly NumericUpDown Minutes=new(){Minimum=0,Maximum=20},Seconds=new(){Minimum=0,Maximum=59};
+    public readonly NumericUpDown Red4=new(){Minimum=0,Maximum=99},Red2=new(){Minimum=0,Maximum=99},Red1=new(){Minimum=0,Maximum=99},Blue4=new(){Minimum=0,Maximum=99},Blue2=new(){Minimum=0,Maximum=99},Blue1=new(){Minimum=0,Maximum=99};
     public readonly ComboBox Winner=new(){DropDownStyle=ComboBoxStyle.DropDownList};
     public readonly ComboBox Reason=new(){DropDownStyle=ComboBoxStyle.DropDownList};
     public readonly ComboBox ClassCode=new(){DropDownStyle=ComboBoxStyle.DropDownList};
@@ -100,7 +101,7 @@ public sealed class ResultDialog:Form{
     public readonly TextBox Judges=new();
     public int DurationSeconds=>(int)(Minutes.Value*60+Seconds.Value);
     public ResultDialog(string red,string blue,string defaultJudges){
-        Text="Результат поединка";Width=580;Height=510;StartPosition=FormStartPosition.CenterParent;
+        Text="Результат поединка";Width=680;Height=610;StartPosition=FormStartPosition.CenterParent;
         Winner.Items.AddRange([red,blue]);Winner.SelectedIndex=0;
         Reason.Items.AddRange(["По очкам","Чистая победа","Болевой приём","Явное преимущество","Техническая победа","По замечаниям","Снятие врачом / травма","Неявка","Дисквалификация"]);
         Reason.SelectedIndex=0;
@@ -111,6 +112,9 @@ public sealed class ResultDialog:Form{
         var p=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Padding=new Padding(14),AutoScroll=true};
         Add(p,$"Баллы: {red}",RedScore);Add(p,$"Баллы: {blue}",BlueScore);Add(p,"Победитель",Winner);Add(p,"Причина победы",Reason);
         Add(p,"Классификационные очки",ClassCode);Add(p,"Время схватки",time);
+        var rq=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true};rq.Controls.Add(new Label{Text="4:",AutoSize=true,Margin=new Padding(0,7,2,0)});rq.Controls.Add(Red4);rq.Controls.Add(new Label{Text="  2:",AutoSize=true,Margin=new Padding(6,7,2,0)});rq.Controls.Add(Red2);rq.Controls.Add(new Label{Text="  1:",AutoSize=true,Margin=new Padding(6,7,2,0)});rq.Controls.Add(Red1);
+        var bq=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true};bq.Controls.Add(new Label{Text="4:",AutoSize=true,Margin=new Padding(0,7,2,0)});bq.Controls.Add(Blue4);bq.Controls.Add(new Label{Text="  2:",AutoSize=true,Margin=new Padding(6,7,2,0)});bq.Controls.Add(Blue2);bq.Controls.Add(new Label{Text="  1:",AutoSize=true,Margin=new Padding(6,7,2,0)});bq.Controls.Add(Blue1);
+        Add(p,$"Оценки 4/2/1: {red}",rq);Add(p,$"Оценки 4/2/1: {blue}",bq);
         int rr=p.RowCount++;p.Controls.Add(Clean,0,rr);p.SetColumnSpan(Clean,2);
         Add(p,"Судьи",Judges);
         var ok=new Button{Text="Подтвердить результат",DialogResult=DialogResult.OK,AutoSize=true};var cancel=new Button{Text="Отмена",DialogResult=DialogResult.Cancel,AutoSize=true};

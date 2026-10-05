@@ -1,4 +1,4 @@
-using Xunit;using SamboSecretary;
+using System.Collections.Generic;using System.Linq;using Xunit;using SamboSecretary;
 public class CoreTests{
 [Theory][InlineData("петров пЕТР пЕТРОВИЧ","ПЕТРОВ Петр Петрович")][InlineData("  Иванов   ИВАН  ","ИВАНОВ Иван")]public void Names(string a,string b)=>Assert.Equal(b,NameNormalizer.Normalize(a));
 [Theory][InlineData(8,8)][InlineData(9,16)][InlineData(16,16)][InlineData(17,32)][InlineData(32,32)]public void Brackets(int n,int s)=>Assert.Equal(s,TournamentEngine.BracketSize(n));

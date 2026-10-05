@@ -121,9 +121,35 @@ public sealed partial class MainForm{
     void EnterResultClick(object? s,EventArgs e){
         var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue)return;
         var b=db.Bouts(cid.Value).FirstOrDefault(x=>x.Id==bid.Value);if(b==null||!b.RedId.HasValue||!b.BlueId.HasValue)return;
+        var oldRule=db.BoutsByRuleId(b.Id);
         string def=string.Join("; ",db.Judges().Where(j=>j.Role is "Руководитель ковра" or "Арбитр" or "Боковой судья").Take(3).Select(j=>j.Name));
         using var d=new ResultDialog(b.RedName,b.BlueName,def);if(d.ShowDialog(this)!=DialogResult.OK)return;
-        long winner=d.Winner.SelectedIndex==0?b.RedId.Value:b.BlueId.Value;db.SetBoutResult(b.Id,(int)d.RedScore.Value,(int)d.BlueScore.Value,winner,d.Reason.Text,d.Judges.Text);ReloadAll();
+        long winner=d.Winner.SelectedIndex==0?b.RedId.Value:b.BlueId.Value;
+        bool changingWinner=oldRule.Status=="Завершён"&&oldRule.WinnerId.HasValue&&oldRule.WinnerId.Value!=winner;
+        if(changingWinner){
+            bool anyFuture=db.Bouts(cid.Value).Any(x=>x.BoutNo>b.BoutNo&&(x.RedId==oldRule.WinnerId||x.BlueId==oldRule.WinnerId));
+            if(anyFuture){
+                if(db.HasCompletedFutureDependency(cid.Value,oldRule.WinnerId!.Value,b.BoutNo)){
+                    var ans=MessageBox.Show("Есть уже проведённые зависимые поединки. Автоматически переписывать их нельзя. Продолжить только как ручное решение главного секретаря с записью в журнал?","Критическое изменение результата",MessageBoxButtons.YesNo,MessageBoxIcon.Warning);
+                    if(ans!=DialogResult.Yes)return;
+                    var reason=Microsoft.VisualBasic.Interaction.InputBox("Укажите причину ручного решения / исправления:","Причина изменения");
+                    if(string.IsNullOrWhiteSpace(reason))return;
+                    db.Audit($"Ручное решение главного секретаря по изменению результата поединка {b.Id}. Причина: {reason}");
+                }else{
+                    var ans=MessageBox.Show("Победитель этого поединка уже поставлен в следующий, ещё не проведённый поединок. При изменении результата программа автоматически заменит участника в зависимой встрече. Продолжить?","Перестроение зависимостей",MessageBoxButtons.YesNo,MessageBoxIcon.Warning);
+                    if(ans!=DialogResult.Yes)return;
+                }
+            }
+        }
+        bool redWon=winner==b.RedId.Value;
+        string requested=d.ClassCode.Text=="Авто"?"":d.ClassCode.Text;
+        var cp=CompetitionRules.ClassificationFor(requested,(int)d.RedScore.Value,(int)d.BlueScore.Value,redWon,d.Reason.Text);
+        db.SetBoutResult(b.Id,(int)d.RedScore.Value,(int)d.BlueScore.Value,winner,d.Reason.Text,d.Judges.Text,cp.Code,cp.Red,cp.Blue,d.DurationSeconds,d.Clean.Checked);
+        if(changingWinner&&!db.HasCompletedFutureDependency(cid.Value,oldRule.WinnerId!.Value,b.BoutNo))
+            db.ReplaceFutureParticipant(cid.Value,oldRule.WinnerId.Value,winner,b.BoutNo);
+        var cat=db.Categories().First(x=>x.Id==cid.Value);
+        if(cat.System=="Олимпийская")ProgressOlympicRepechage(cid.Value);
+        AutoBackup();ReloadAll();
     }
 
     void AdvanceStageClick(object? s,EventArgs e){

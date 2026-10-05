@@ -257,7 +257,7 @@ public sealed partial class MainForm{
     IEnumerable<string> ParticipantLines()=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | {a.Region} | {a.Team} | {a.Discipline} | {a.AgeGroup} | {a.WeightCategory} | {a.Status}"));
     IEnumerable<string> CredentialLines()=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | {a.BirthDate} | {a.Region} | {a.Organization} | {a.Discipline} | {a.AgeGroup} | {a.WeightCategory} | статус: {a.Status} | причина: {a.StatusReason}"));
     IEnumerable<string> WeighLines(bool filled)=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | категория {a.WeightCategory} | заявл. {a.DeclaredWeight?.ToString()??"___"} | факт. {(filled?a.ActualWeight?.ToString()??"___":"___")} | {(filled?a.Status:"________")} | причина {(filled?a.StatusReason:"________")}"));
-    IEnumerable<string> JudgeLines()=>HeaderLines().Concat(db.Judges().Select((j,i)=>$"{i+1}. {j.Name} | {j.Region} | {j.Category} | {j.Role}"));
+    IEnumerable<string> JudgeLines()=>HeaderLines().Concat(db.Judges().Select((j,i)=>$"{i+1}. {j.Name} | {j.Region} | {j.Category} | {j.Role} | {j.Notes}"));
     IEnumerable<string> CategoryLines(long cid){
         var c=db.Categories().First(x=>x.Id==cid);var lines=new List<string>();lines.AddRange(HeaderLines());lines.Add($"{c.Discipline}; {c.Gender}; {c.AgeGroup}; {c.WeightCategory}; система: {c.System}; утешительные: {c.Repechage}");lines.Add("");
         var assignments=db.JudgeAssignments(cid);if(assignments.Count>0){lines.Add("СУДЕЙСКИЕ НАЗНАЧЕНИЯ:");lines.AddRange(assignments.Select(x=>$"Ковёр {x.Mat}: {x.Role} — {x.JudgeName}"));lines.Add("");}

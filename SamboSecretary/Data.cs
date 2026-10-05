@@ -124,7 +124,8 @@ public sealed class Database {
         var id=(long)q.ExecuteScalar()!; Audit($"Добавлена категория {discipline}, {gender}, {age}, {weight}"); return id;
     }
     public void UpdateCategory(long id,string discipline,string gender,string age,string weight,string system,string repechage,string drawMode){
-        using var c=Open();using var q=c.CreateCommand();q.CommandText=@"UPDATE categories SET discipline=$d,gender=$g,age_group=$a,weight_category=$w,system=$s,repechage=$r,draw_mode=$m WHERE id=$id";
+        using var c=Open();using(var chk=c.CreateCommand()){chk.CommandText="SELECT COUNT(*) FROM bouts WHERE category_id=$id AND status='Завершён'";chk.Parameters.AddWithValue("$id",id);if(Convert.ToInt32(chk.ExecuteScalar())>0)throw new InvalidOperationException("Нельзя менять параметры категории после проведения поединков.");}
+        using var q=c.CreateCommand();q.CommandText=@"UPDATE categories SET discipline=$d,gender=$g,age_group=$a,weight_category=$w,system=$s,repechage=$r,draw_mode=$m WHERE id=$id";
         q.Parameters.AddWithValue("$d",discipline);q.Parameters.AddWithValue("$g",gender);q.Parameters.AddWithValue("$a",age);q.Parameters.AddWithValue("$w",weight);q.Parameters.AddWithValue("$s",system);q.Parameters.AddWithValue("$r",repechage);q.Parameters.AddWithValue("$m",drawMode);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Изменена категория {id}");
     }
     public void DeleteCategory(long id){
@@ -164,6 +165,7 @@ public sealed class Database {
     }
     void EnsureEligibilityUnlocked(SqliteConnection c,long athleteId){
         var old=AthleteCompetitionFields(c,athleteId);if(CategoryApproved(c,old.CategoryId))throw new InvalidOperationException("Жеребьёвка категории утверждена. Сначала разблокируйте её, затем меняйте допуск или взвешивание.");
+        if(old.CategoryId.HasValue){using var q=c.CreateCommand();q.CommandText="SELECT COUNT(*) FROM bouts WHERE category_id=$c AND status='Завершён'";q.Parameters.AddWithValue("$c",old.CategoryId.Value);if(Convert.ToInt32(q.ExecuteScalar())>0)throw new InvalidOperationException("В категории уже есть проведённые поединки. Допуск и данные взвешивания нельзя менять задним числом.");}
     }
 
     public void UpdateAthlete(long id,string fullName,string birth,string gender,string region,string organization,string team,string coach,string rank,string discipline,string age,string weight,double? declaredWeight,long? categoryId){
@@ -231,7 +233,10 @@ public sealed class Database {
         using var r=q.ExecuteReader();var x=new List<(int,long?,string,string)>();while(r.Read())x.Add((r.GetInt32(0),r.IsDBNull(1)?null:r.GetInt64(1),r.GetString(2),r.GetString(3)));return x;
     }
 
-    public void ClearBouts(long categoryId){using var c=Open();using var q=c.CreateCommand();q.CommandText="DELETE FROM bouts WHERE category_id=$c";q.Parameters.AddWithValue("$c",categoryId);q.ExecuteNonQuery();}
+    public void ClearBouts(long categoryId){
+        using var c=Open();using(var chk=c.CreateCommand()){chk.CommandText="SELECT COUNT(*) FROM bouts WHERE category_id=$c AND status='Завершён'";chk.Parameters.AddWithValue("$c",categoryId);if(Convert.ToInt32(chk.ExecuteScalar())>0)throw new InvalidOperationException("Нельзя удалить или пережеребьевать сетку: в категории уже есть проведённые поединки. Используйте исправление результата с журналированием.");}
+        using var q=c.CreateCommand();q.CommandText="DELETE FROM bouts WHERE category_id=$c";q.Parameters.AddWithValue("$c",categoryId);q.ExecuteNonQuery();
+    }
     public long AddBout(long categoryId,int no,string stage,long? red,long? blue,int mat=1){
         using var c=Open();using var q=c.CreateCommand();q.CommandText=@"INSERT INTO bouts(category_id,bout_no,display_no,stage,red_id,blue_id,mat,status,scheduled_time) VALUES($c,$n,$n,$s,$r,$b,$m,'Ожидает','');SELECT last_insert_rowid();";
         q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$n",no);q.Parameters.AddWithValue("$s",stage);q.Parameters.AddWithValue("$r",(object?)red??DBNull.Value);q.Parameters.AddWithValue("$b",(object?)blue??DBNull.Value);q.Parameters.AddWithValue("$m",mat);return (long)q.ExecuteScalar()!;

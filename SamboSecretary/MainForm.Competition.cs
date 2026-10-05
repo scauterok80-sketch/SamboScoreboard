@@ -130,16 +130,17 @@ public sealed partial class MainForm{
     void ChangeBoutStateClick(object? s,EventArgs e){
         var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue)return;
         var b=db.Bouts(cid.Value).FirstOrDefault(x=>x.Id==bid.Value);if(b==null)return;
-        var status=Microsoft.VisualBasic.Interaction.InputBox("Статус: Ожидает / Готов / Вызван / Идёт / Завершён","Статус поединка",b.Status);
+        if(b.Status=="Завершён"){MessageBox.Show("Завершённый поединок изменяется через «Внести результат», чтобы сохранить корректировку в журнале.");return;}
+        var status=Microsoft.VisualBasic.Interaction.InputBox("Статус: Ожидает / Готов / Вызван / Идёт","Статус поединка",b.Status);
         if(string.IsNullOrWhiteSpace(status))return;
-        var allowed=new[]{"Ожидает","Готов","Вызван","Идёт","Завершён"};
-        if(!allowed.Contains(status.Trim(),StringComparer.OrdinalIgnoreCase)){MessageBox.Show("Разрешённые статусы: Ожидает, Готов, Вызван, Идёт, Завершён.");return;}
+        var allowed=new[]{"Ожидает","Готов","Вызван","Идёт"};
+        if(!allowed.Contains(status.Trim(),StringComparer.OrdinalIgnoreCase)){MessageBox.Show("Разрешённые статусы: Ожидает, Готов, Вызван, Идёт. Для завершения внесите результат.");return;}
         var matText=Microsoft.VisualBasic.Interaction.InputBox($"Номер ковра (1–{tMats.Value})","Ковёр",b.Mat.ToString());
         if(!int.TryParse(matText,out var mat)||mat<1||mat>(int)tMats.Value){MessageBox.Show("Некорректный номер ковра.");return;}
         var displayText=Microsoft.VisualBasic.Interaction.InputBox("Видимый номер поединка (не меняет положение в сетке):","Номер поединка",b.DisplayNo.ToString());
         if(!int.TryParse(displayText,out var displayNo)||displayNo<1){MessageBox.Show("Некорректный видимый номер.");return;}
         var scheduled=Microsoft.VisualBasic.Interaction.InputBox("Плановое время, например 14:35 (можно оставить пустым):","Расписание",b.ScheduledTime);
-        db.SetBoutStatus(b.Id,status.Trim(),mat,scheduled.Trim(),displayNo);AutoBackup();ReloadAll();
+        UiGuard(()=>{db.SetBoutStatus(b.Id,status.Trim(),mat,scheduled.Trim(),displayNo);AutoBackup();ReloadAll();},"Статус поединка не изменён");
     }
 
     void EnterResultClick(object? s,EventArgs e){

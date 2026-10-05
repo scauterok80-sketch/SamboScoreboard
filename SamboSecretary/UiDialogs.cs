@@ -45,14 +45,14 @@ public sealed class AthleteDialog:Form{
 }
 
 public sealed class JudgeDialog:Form{
-    public readonly TextBox NameBox=new(),Region=new(),Category=new();
+    public readonly TextBox NameBox=new(),Region=new(),Category=new(),Notes=new(){Multiline=true,Height=60};
     public readonly ComboBox Role=new(){DropDownStyle=ComboBoxStyle.DropDownList};
     public JudgeDialog(){
-        Text="Судья";Width=460;Height=330;StartPosition=FormStartPosition.CenterParent;
+        Text="Судья";Width=520;Height=420;StartPosition=FormStartPosition.CenterParent;
         Role.Items.AddRange(["Главный судья","Главный секретарь","Руководитель ковра","Арбитр","Боковой судья","Секретарь ковра","Судья при участниках","Судья на взвешивании"]);
         Role.SelectedIndex=3;
         var p=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Padding=new Padding(14)};
-        Add(p,"ФИО",NameBox);Add(p,"Регион",Region);Add(p,"Судейская категория",Category);Add(p,"Роль",Role);
+        Add(p,"ФИО",NameBox);Add(p,"Регион",Region);Add(p,"Судейская категория",Category);Add(p,"Роль",Role);Add(p,"Примечания",Notes);
         var ok=new Button{Text="Сохранить",DialogResult=DialogResult.OK,AutoSize=true};var cancel=new Button{Text="Отмена",DialogResult=DialogResult.Cancel,AutoSize=true};
         var b=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,AutoSize=true};b.Controls.Add(cancel);b.Controls.Add(ok);p.Controls.Add(b,0,p.RowCount);p.SetColumnSpan(b,2);Controls.Add(p);AcceptButton=ok;CancelButton=cancel;
     }

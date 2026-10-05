@@ -30,7 +30,15 @@ public sealed partial class MainForm:Form{
         Text="Самбо-секретарь 2.0";WindowState=FormWindowState.Maximized;MinimumSize=new Size(1100,700);
         db=new Database(Path.Combine(root,"sambo.db"));
         BuildTournamentTab();BuildCategoriesTab();BuildAthletesTab();BuildWeighTab();BuildJudgesTab();BuildDrawTab();BuildBoutsTab();BuildMatsTab();BuildResultsTab();BuildDocumentsTab();BuildAuditTab();
-        Controls.Add(tabs);LoadTournament();ReloadAll();
+        Controls.Add(tabs);LoadTournament();ReloadAll();ShowResumeNotice();
+    }
+
+    void ShowResumeNotice(){
+        if(Environment.GetCommandLineArgs().Any(a=>a.Equals("--selftest",StringComparison.OrdinalIgnoreCase)))return;
+        var t=db.GetTournament();if(string.IsNullOrWhiteSpace(t.Name))return;
+        var all=db.Categories().SelectMany(x=>db.Bouts(x.Id)).ToList();
+        if(all.Any(x=>x.Status!="Завершён"))
+            MessageBox.Show($"Восстановлен незавершённый турнир «{t.Name}». Все сохранённые данные, жеребьёвки и результаты загружены из рабочей базы.","Продолжение турнира",MessageBoxButtons.OK,MessageBoxIcon.Information);
     }
 
     static DataGridView Grid()=>new(){Dock=DockStyle.Fill,ReadOnly=true,AllowUserToAddRows=false,SelectionMode=DataGridViewSelectionMode.FullRowSelect,MultiSelect=false,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.DisplayedCells};

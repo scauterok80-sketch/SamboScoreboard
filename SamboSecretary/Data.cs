@@ -141,6 +141,9 @@ public sealed class Database {
         using var c=Open();using var q=c.CreateCommand();q.CommandText=@"INSERT INTO bouts(category_id,bout_no,stage,red_id,blue_id,mat,status) VALUES($c,$n,$s,$r,$b,$m,'Ожидает');SELECT last_insert_rowid();";
         q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$n",no);q.Parameters.AddWithValue("$s",stage);q.Parameters.AddWithValue("$r",(object?)red??DBNull.Value);q.Parameters.AddWithValue("$b",(object?)blue??DBNull.Value);q.Parameters.AddWithValue("$m",mat);return (long)q.ExecuteScalar()!;
     }
+    public void SetBoutStatus(long boutId,string status,int mat){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE bouts SET status=$s,mat=$m WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$m",mat);q.Parameters.AddWithValue("$id",boutId);q.ExecuteNonQuery();Audit($"Поединок {boutId}: статус {status}, ковёр {mat}");
+    }
     public void SetBoutResult(long boutId,int redScore,int blueScore,long winnerId,string reason,string judges){
         using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE bouts SET red_score=$rs,blue_score=$bs,winner_id=$w,reason=$r,judges=$j,status='Завершён' WHERE id=$id";
         q.Parameters.AddWithValue("$rs",redScore);q.Parameters.AddWithValue("$bs",blueScore);q.Parameters.AddWithValue("$w",winnerId);q.Parameters.AddWithValue("$r",reason);q.Parameters.AddWithValue("$j",judges);q.Parameters.AddWithValue("$id",boutId);q.ExecuteNonQuery();Audit($"Внесён результат поединка {boutId}");
@@ -169,4 +172,10 @@ public static class ExcelImporter {
         return headers.FirstOrDefault(h=>keys.Any(k=>h.Contains(k,StringComparison.OrdinalIgnoreCase)))??"";
     }
     public static string Value(Dictionary<string,string> row,string? header)=>string.IsNullOrWhiteSpace(header)?"":(row.TryGetValue(header,out var v)?v:"");
+    public static void CreateTemplate(string path){
+        using var wb=new XLWorkbook();var ws=wb.AddWorksheet("Заявка");
+        string[] headers={"Фамилия","Имя","Отчество","Дата рождения","Пол","Регион","Организация","Команда","Тренер","Разряд","Дисциплина","Возрастная группа","Весовая категория","Заявленный вес"};
+        for(int i=0;i<headers.Length;i++){ws.Cell(1,i+1).Value=headers[i];ws.Cell(1,i+1).Style.Font.Bold=true;}
+        ws.SheetView.FreezeRows(1);ws.Columns().AdjustToContents();wb.SaveAs(path);
+    }
 }

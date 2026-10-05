@@ -23,8 +23,15 @@ public sealed partial class MainForm{
         fixedPos??=new Dictionary<long,int>();
         foreach(var kv in fixedPos){slots[kv.Value-1]=kv.Key;fixedIndexes.Add(kv.Value-1);}
         var rest=athletes.Where(a=>!fixedPos.ContainsKey(a.Id)).OrderBy(_=>rng.Next()).ToList();
+        var emptyPairs=Enumerable.Range(0,size/2).Where(p=>slots[p*2]==null&&slots[p*2+1]==null).OrderBy(_=>rng.Next()).ToList();
+        if(rest.Count<emptyPairs.Count)throw new InvalidOperationException("Фиксированный посев создаёт пустую пару BYE–BYE. Измените позиции сеяных спортсменов.");
+        int k=0;
+        foreach(var p in emptyPairs){
+            int left=p*2,right=left+1;
+            int target=rng.Next(2)==0?left:right;slots[target]=rest[k++].Id;
+        }
         var free=Enumerable.Range(0,size).Where(i=>slots[i]==null).OrderBy(_=>rng.Next()).ToList();
-        for(int i=0;i<rest.Count;i++)slots[free[i]]=rest[i].Id;
+        for(int i=0;k<rest.Count;i++,k++)slots[free[i]]=rest[k].Id;
         var teams=athletes.ToDictionary(a=>a.Id,a=>a.Team??"");
         int Conflicts(){
             int n=0;for(int i=0;i<size;i+=2){

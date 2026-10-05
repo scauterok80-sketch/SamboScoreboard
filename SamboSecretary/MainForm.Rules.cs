@@ -182,9 +182,15 @@ public sealed partial class MainForm{
 
     IEnumerable<string> TeamStandingLines(){
         var all=db.Categories().SelectMany(c=>db.Placements(c.Id)).Where(p=>!string.IsNullOrWhiteSpace(p.Team)).ToList();
-        var rows=all.GroupBy(p=>p.Team).Select(g=>new{Team=g.Key,Gold=g.Count(x=>x.Place==1),Silver=g.Count(x=>x.Place==2),Bronze=g.Count(x=>x.Place==3),Fifth=g.Count(x=>x.Place==5)})
-            .OrderByDescending(x=>x.Gold).ThenByDescending(x=>x.Silver).ThenByDescending(x=>x.Bronze).ThenByDescending(x=>x.Fifth).ThenBy(x=>x.Team).ToList();
-        var lines=new List<string>();lines.AddRange(HeaderLines());int n=1;foreach(var x in rows)lines.Add($"{n++}. {x.Team} | золото {x.Gold} | серебро {x.Silver} | бронза {x.Bronze} | 5-е места {x.Fifth}");return lines;
+        var scheme=(db.GetTournament().TeamScheme??"7,5,3,1").Split(new[]{',',';','/'},StringSplitOptions.RemoveEmptyEntries).Select(x=>int.TryParse(x.Trim(),out var v)?v:0).ToList();
+        while(scheme.Count<4)scheme.Add(new[]{7,5,3,1}[scheme.Count]);
+        int Points(int place)=>place switch{1=>scheme[0],2=>scheme[1],3=>scheme[2],5 or 6=>scheme[3],_=>0};
+        var rows=all.GroupBy(p=>p.Team).Select(g=>new{
+            Team=g.Key,Points=g.Sum(x=>Points(x.Place)),Gold=g.Count(x=>x.Place==1),Silver=g.Count(x=>x.Place==2),
+            Bronze=g.Count(x=>x.Place==3),FifthSixth=g.Count(x=>x.Place is 5 or 6)
+        }).OrderByDescending(x=>x.Points).ThenByDescending(x=>x.Gold).ThenByDescending(x=>x.Silver).ThenByDescending(x=>x.Bronze).ThenByDescending(x=>x.FifthSixth).ThenBy(x=>x.Team).ToList();
+        var lines=new List<string>();lines.AddRange(HeaderLines());lines.Add($"Схема командных очков 1/2/3/5-6: {string.Join("/",scheme.Take(4))}");
+        int n=1;foreach(var x in rows)lines.Add($"{n++}. {x.Team} | {x.Points} очк. | 1-х: {x.Gold} | 2-х: {x.Silver} | 3-х: {x.Bronze} | 5-6-х: {x.FifthSixth}");return lines;
     }
 
     IEnumerable<string> FullProtocolPackageLines(){

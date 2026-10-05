@@ -31,9 +31,19 @@ public static class TournamentEngine {
   for(int round=0;round<n-1;round++){for(int i=0;i<n/2;i++){var x=a[i];var y=a[n-1-i];if(x!=0&&y!=0)r.Add(new(no++,x,y,$"Круг {round+1}"));}var last=a[^1];a.RemoveAt(a.Count-1);a.Insert(1,last);}return r;
  }
  public static List<long?> Draw(IReadOnlyList<long> ids,int size,DrawMode mode,IDictionary<long,int>? seeded=null,int seed=12345){
-  if(ids.Count>size)throw new ArgumentException("Участников больше сетки");var slots=Enumerable.Repeat<long?>(null,size).ToList();seeded??=new Dictionary<long,int>();
+  if(ids.Count>size)throw new ArgumentException("Участников больше сетки");
+  if(size<2||size%2!=0)throw new ArgumentException("Некорректный размер сетки");
+  var slots=Enumerable.Repeat<long?>(null,size).ToList();seeded??=new Dictionary<long,int>();
   foreach(var kv in seeded){if(kv.Value<1||kv.Value>size||slots[kv.Value-1]!=null||!ids.Contains(kv.Key))throw new ArgumentException("Некорректный посев");slots[kv.Value-1]=kv.Key;}
-  if(mode==DrawMode.Manual)return slots;var rng=new Random(seed);var rest=ids.Where(x=>!seeded.ContainsKey(x)).OrderBy(_=>rng.Next()).ToList();var free=Enumerable.Range(0,size).Where(i=>slots[i]==null).OrderBy(_=>rng.Next()).ToList();for(int i=0;i<rest.Count;i++)slots[free[i]]=rest[i];return slots;
+  if(mode==DrawMode.Manual)return slots;
+  var rng=new Random(seed);var rest=ids.Where(x=>!seeded.ContainsKey(x)).OrderBy(_=>rng.Next()).ToList();
+  var emptyPairs=Enumerable.Range(0,size/2).Where(p=>slots[p*2]==null&&slots[p*2+1]==null).OrderBy(_=>rng.Next()).ToList();
+  if(rest.Count<emptyPairs.Count)throw new ArgumentException("Фиксированный посев создаёт пустую пару BYE–BYE. Измените позиции сеяных спортсменов.");
+  int k=0;
+  foreach(var p in emptyPairs){int target=p*2+(rng.Next(2));slots[target]=rest[k++];}
+  var free=Enumerable.Range(0,size).Where(i=>slots[i]==null).OrderBy(_=>rng.Next()).ToList();
+  for(int i=0;k<rest.Count;i++,k++)slots[free[i]]=rest[k];
+  return slots;
  }
  public static (Bout,Bout) MixedSemis(long A1,long A2,long B1,long B2)=>(new(1,A1,B2,"Полуфинал"),new(2,B1,A2,"Полуфинал"));
 }

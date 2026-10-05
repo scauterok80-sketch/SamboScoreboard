@@ -119,4 +119,25 @@ public class OperationalTests{
         var a=Assert.Single(db.Athletes());
         Assert.Equal("Не допущен",a.Status);Assert.Equal("нет медицинского допуска",a.StatusReason);
     }
+
+    [Fact]
+    public void CompletedBoutCannotBeClearedByRedraw(){
+        var db=new Database(TempDb());
+        var cid=db.AddCategory("Спортивное самбо","Мужчины","18+","71 кг","Олимпийская","Без утешительных встреч","Полностью автоматическая");
+        long a=db.AddAthlete("альфа один",categoryId:cid),b=db.AddAthlete("бета два",categoryId:cid);
+        long bout=db.AddBout(cid,1,"1/4",a,b,1);
+        db.SetBoutResult(bout,4,0,a,"По очкам","","3:0",3,0,240,false);
+        Assert.Throws<InvalidOperationException>(()=>db.ClearBouts(cid));
+    }
+
+    [Fact]
+    public void OnlyOneBoutCanBeInProgressOnMat(){
+        var db=new Database(TempDb());
+        var cid=db.AddCategory("Спортивное самбо","Мужчины","18+","71 кг","Круговая","","");
+        long a=db.AddAthlete("альфа один",categoryId:cid),b=db.AddAthlete("бета два",categoryId:cid),c=db.AddAthlete("гамма три",categoryId:cid),d=db.AddAthlete("дельта четыре",categoryId:cid);
+        long b1=db.AddBout(cid,1,"Круг 1",a,b,1),b2=db.AddBout(cid,2,"Круг 1",c,d,1);
+        db.SetBoutStatus(b1,"Идёт",1);
+        Assert.Throws<InvalidOperationException>(()=>db.SetBoutStatus(b2,"Идёт",1));
+        Assert.Throws<InvalidOperationException>(()=>db.SetBoutStatus(b2,"Завершён",1));
+    }
 }

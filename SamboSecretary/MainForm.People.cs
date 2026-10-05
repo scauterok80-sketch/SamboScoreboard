@@ -32,6 +32,7 @@ public sealed partial class MainForm{
         var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=50,Padding=new Padding(4),AutoScroll=true};
         bar.Controls.Add(Btn("Добавить спортсмена",AddAthleteClick));
         bar.Controls.Add(Btn("Импорт Excel",ImportExcelClick));
+        bar.Controls.Add(Btn("Создать Excel-шаблон",(s,e)=>{using var save=new SaveFileDialog{Filter="Excel (*.xlsx)|*.xlsx",FileName="Заявка_Самбо.xlsx"};if(save.ShowDialog(this)==DialogResult.OK){ExcelImporter.CreateTemplate(save.FileName);MessageBox.Show("Шаблон сохранён.");}}));
         bar.Controls.Add(new Label{Text="Назначить категорию:",AutoSize=true,Margin=new Padding(15,12,4,0)});
         bar.Controls.Add(assignCategory);
         bar.Controls.Add(Btn("Назначить",(s,e)=>{var id=SelectedId(athleteGrid);var cid=SelectedCategory(assignCategory);if(id.HasValue&&cid.HasValue){db.AssignCategory(id.Value,cid.Value);ReloadAll();}}));

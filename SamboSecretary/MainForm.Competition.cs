@@ -153,7 +153,8 @@ public sealed partial class MainForm{
         bool redWon=winner==b.RedId.Value;
         string requested=d.ClassCode.Text=="Авто"?"":d.ClassCode.Text;
         var cp=CompetitionRules.ClassificationFor(requested,(int)d.RedScore.Value,(int)d.BlueScore.Value,redWon,d.Reason.Text);
-        db.SetBoutResult(b.Id,(int)d.RedScore.Value,(int)d.BlueScore.Value,winner,d.Reason.Text,d.Judges.Text,cp.Code,cp.Red,cp.Blue,d.DurationSeconds,d.Clean.Checked);
+        db.SetBoutResult(b.Id,(int)d.RedScore.Value,(int)d.BlueScore.Value,winner,d.Reason.Text,d.Judges.Text,cp.Code,cp.Red,cp.Blue,d.DurationSeconds,d.Clean.Checked,
+            (int)d.Red4.Value,(int)d.Red2.Value,(int)d.Red1.Value,(int)d.Blue4.Value,(int)d.Blue2.Value,(int)d.Blue1.Value);
         if(changingWinner&&!db.HasCompletedFutureDependency(cid.Value,oldRule.WinnerId!.Value,b.BoutNo))
             db.ReplaceFutureParticipant(cid.Value,oldRule.WinnerId.Value,winner,b.BoutNo);
         var cat=db.Categories().First(x=>x.Id==cid.Value);

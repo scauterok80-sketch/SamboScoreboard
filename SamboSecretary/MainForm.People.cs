@@ -4,12 +4,18 @@ public sealed partial class MainForm{
     readonly ComboBox judgeAssignmentCategory=new(){DropDownStyle=ComboBoxStyle.DropDownList,Width=340};
     readonly NumericUpDown judgeAssignmentMat=new(){Minimum=1,Maximum=12,Value=1,Width=70};
     readonly DataGridView judgeAssignmentGrid=Grid();
+    readonly Label tournamentStats=new(){AutoSize=true,Font=new Font("Segoe UI",11,FontStyle.Bold),Padding=new Padding(8),Margin=new Padding(3,18,3,3)};
     void BuildTournamentTab(){
         var page=Page("Турнир");
         var p=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(18),MaximumSize=new Size(900,0)};
         AddField(p,"Название соревнования",tName);AddField(p,"Место проведения",tPlace);AddField(p,"Дата начала",tStart);AddField(p,"Дата окончания",tEnd);AddField(p,"Количество ковров",tMats);AddField(p,"Главный судья",tChiefRef);AddField(p,"Главный секретарь",tChiefSec);
         var save=Btn("Сохранить данные турнира",(s,e)=>{db.SaveTournament(tName.Text,tPlace.Text,tStart.Text,tEnd.Text,(int)tMats.Value,tChiefRef.Text,tChiefSec.Text);MessageBox.Show("Данные турнира сохранены.");ReloadAudit();});
-        p.Controls.Add(save,1,p.RowCount);page.Controls.Add(p);
+        p.Controls.Add(save,1,p.RowCount);int rr=p.RowCount++;p.Controls.Add(tournamentStats,0,rr);p.SetColumnSpan(tournamentStats,2);page.Controls.Add(p);
+    }
+    void ReloadDashboard(){
+        var athletes=db.Athletes();var cats=db.Categories();var bouts=cats.SelectMany(x=>db.Bouts(x.Id)).ToList();
+        tournamentStats.Text=$"Участников: {athletes.Count}    Допущено: {athletes.Count(x=>x.Status=="Допущен")}    Взвешено: {athletes.Count(x=>x.ActualWeight.HasValue)}\n"+
+            $"Категорий: {cats.Count}    Жеребьёвок утверждено: {cats.Count(x=>x.DrawApproved)}    Поединков: {bouts.Count(x=>x.Status=="Завершён")}/{bouts.Count}    Ковров: {(int)tMats.Value}";
     }
     static void AddField(TableLayoutPanel p,string label,Control c){int r=p.RowCount++;p.RowStyles.Add(new RowStyle(SizeType.AutoSize));p.Controls.Add(new Label{Text=label,AutoSize=true,Margin=new Padding(3,10,15,3)},0,r);c.Dock=DockStyle.Fill;c.Width=500;p.Controls.Add(c,1,r);}
     void LoadTournament(){var t=db.GetTournament();tName.Text=t.Name;tPlace.Text=t.Place;tStart.Text=t.StartDate;tEnd.Text=t.EndDate;tMats.Value=Math.Clamp(t.Mats,1,12);tChiefRef.Text=t.ChiefReferee;tChiefSec.Text=t.ChiefSecretary;}

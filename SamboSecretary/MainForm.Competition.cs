@@ -203,8 +203,11 @@ public sealed partial class MainForm{
         p.Controls.Add(Btn("Пустой протокол взвешивания",(s,e)=>PrintLines("ПРОТОКОЛ ВЗВЕШИВАНИЯ",WeighLines(false))));
         p.Controls.Add(Btn("Заполненный протокол взвешивания",(s,e)=>PrintLines("ПРОТОКОЛ ВЗВЕШИВАНИЯ — РЕЗУЛЬТАТ",WeighLines(true))));
         p.Controls.Add(Btn("Список судей",(s,e)=>PrintLines("СУДЕЙСКИЙ КОРПУС",JudgeLines())));
+        p.Controls.Add(Btn("Пустой протокол выбранной категории",(s,e)=>{var cid=SelectedCategory(boutCategory)??SelectedCategory(drawCategory);if(cid.HasValue)PrintLines("ПУСТОЙ ПРОТОКОЛ КАТЕГОРИИ",BlankCategoryLines(cid.Value));else MessageBox.Show("Сначала выберите категорию.");}));
         p.Controls.Add(Btn("Протокол выбранной категории",(s,e)=>{var cid=SelectedCategory(boutCategory)??SelectedCategory(drawCategory);if(cid.HasValue)PrintLines("ПРОТОКОЛ КАТЕГОРИИ",CategoryLines(cid.Value));else MessageBox.Show("Сначала выберите категорию на вкладке «Поединки» или «Жеребьёвка».");}));
+        p.Controls.Add(Btn("Командный зачёт",(s,e)=>PrintLines("КОМАНДНЫЙ ЗАЧЁТ",TeamStandingLines())));
         p.Controls.Add(Btn("Сводный протокол соревнования",(s,e)=>PrintLines("СВОДНЫЙ ПРОТОКОЛ",SummaryLines())));
+        p.Controls.Add(Btn("Полный пакет соревнования",(s,e)=>PrintLines("ПОЛНЫЙ ПАКЕТ СОРЕВНОВАНИЯ",FullProtocolPackageLines())));
         p.Controls.Add(Btn("Резервная копия базы",BackupClick));
         page.Controls.Add(p);
     }

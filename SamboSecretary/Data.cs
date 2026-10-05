@@ -127,7 +127,14 @@ public sealed class Database {
         using var c=Open();using var q=c.CreateCommand();q.CommandText=@"UPDATE categories SET discipline=$d,gender=$g,age_group=$a,weight_category=$w,system=$s,repechage=$r,draw_mode=$m WHERE id=$id";
         q.Parameters.AddWithValue("$d",discipline);q.Parameters.AddWithValue("$g",gender);q.Parameters.AddWithValue("$a",age);q.Parameters.AddWithValue("$w",weight);q.Parameters.AddWithValue("$s",system);q.Parameters.AddWithValue("$r",repechage);q.Parameters.AddWithValue("$m",drawMode);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Изменена категория {id}");
     }
-    public void DeleteCategory(long id){ using var c=Open(); using var q=c.CreateCommand(); q.CommandText="DELETE FROM categories WHERE id=$id"; q.Parameters.AddWithValue("$id",id); q.ExecuteNonQuery(); Audit($"Удалена категория {id}"); }
+    public void DeleteCategory(long id){
+        using var c=Open();
+        foreach(var sql in new[]{"SELECT COUNT(*) FROM athletes WHERE category_id=$id","SELECT COUNT(*) FROM draw_positions WHERE category_id=$id","SELECT COUNT(*) FROM bouts WHERE category_id=$id","SELECT COUNT(*) FROM placements WHERE category_id=$id","SELECT COUNT(*) FROM judge_assignments WHERE category_id=$id"}){
+            using var chk=c.CreateCommand();chk.CommandText=sql;chk.Parameters.AddWithValue("$id",id);
+            if(Convert.ToInt32(chk.ExecuteScalar())>0)throw new InvalidOperationException("Категория содержит участников, жеребьёвку, поединки, результаты или назначения судей. Сначала удалите/перенесите связанные данные.");
+        }
+        using var q=c.CreateCommand();q.CommandText="DELETE FROM categories WHERE id=$id";q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Удалена категория {id}");
+    }
     public void UpdateCategorySettings(long id,string system,string repechage,string drawMode){
         using var c=Open(); using var q=c.CreateCommand(); q.CommandText="UPDATE categories SET system=$s,repechage=$r,draw_mode=$m WHERE id=$id";
         q.Parameters.AddWithValue("$s",system);q.Parameters.AddWithValue("$r",repechage);q.Parameters.AddWithValue("$m",drawMode);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();
@@ -148,17 +155,39 @@ public sealed class Database {
         var id=(long)q.ExecuteScalar()!;Audit("Добавлен спортсмен "+NameNormalizer.Normalize(fullName));return id;
     }
 
+    bool CategoryApproved(SqliteConnection c,long? categoryId){
+        if(!categoryId.HasValue)return false;using var q=c.CreateCommand();q.CommandText="SELECT COALESCE(draw_approved,0) FROM categories WHERE id=$id";q.Parameters.AddWithValue("$id",categoryId.Value);return Convert.ToInt32(q.ExecuteScalar()??0)!=0;
+    }
+    (long? CategoryId,string Discipline,string Gender,string Age,string Weight) AthleteCompetitionFields(SqliteConnection c,long id){
+        using var q=c.CreateCommand();q.CommandText="SELECT category_id,COALESCE(discipline,''),COALESCE(gender,''),COALESCE(age_group,''),COALESCE(weight_category,'') FROM athletes WHERE id=$id";q.Parameters.AddWithValue("$id",id);using var r=q.ExecuteReader();if(!r.Read())throw new InvalidOperationException("Спортсмен не найден");
+        return(r.IsDBNull(0)?null:r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4));
+    }
+    void EnsureEligibilityUnlocked(SqliteConnection c,long athleteId){
+        var old=AthleteCompetitionFields(c,athleteId);if(CategoryApproved(c,old.CategoryId))throw new InvalidOperationException("Жеребьёвка категории утверждена. Сначала разблокируйте её, затем меняйте допуск или взвешивание.");
+    }
+
     public void UpdateAthlete(long id,string fullName,string birth,string gender,string region,string organization,string team,string coach,string rank,string discipline,string age,string weight,double? declaredWeight,long? categoryId){
-        using var c=Open();using var q=c.CreateCommand();q.CommandText=@"UPDATE athletes SET full_name=$n,birth_date=$b,gender=$g,region=$r,organization=$o,team=$t,coach=$c,rank=$rk,discipline=$d,age_group=$a,weight_category=$w,declared_weight=$dw,category_id=$cid WHERE id=$id";
+        using var c=Open();var old=AthleteCompetitionFields(c,id);
+        bool criticalChanged=old.CategoryId!=categoryId||!string.Equals(old.Discipline,discipline,StringComparison.OrdinalIgnoreCase)||!string.Equals(old.Gender,gender,StringComparison.OrdinalIgnoreCase)||!string.Equals(old.Age,age,StringComparison.OrdinalIgnoreCase)||!string.Equals(old.Weight,weight,StringComparison.OrdinalIgnoreCase);
+        if(criticalChanged&&CategoryApproved(c,old.CategoryId))throw new InvalidOperationException("Нельзя менять соревновательные данные спортсмена после утверждения жеребьёвки. Сначала разблокируйте категорию.");
+        if(old.CategoryId!=categoryId){using var chk=c.CreateCommand();chk.CommandText="SELECT COUNT(*) FROM bouts WHERE red_id=$id OR blue_id=$id OR winner_id=$id";chk.Parameters.AddWithValue("$id",id);if(Convert.ToInt32(chk.ExecuteScalar())>0)throw new InvalidOperationException("Нельзя перенести спортсмена в другую категорию: он уже включён в поединки.");}
+        if(categoryId.HasValue&&categoryId!=old.CategoryId&&CategoryApproved(c,categoryId))throw new InvalidOperationException("Нельзя добавить спортсмена в категорию с утверждённой жеребьёвкой.");
+        using var q=c.CreateCommand();q.CommandText=@"UPDATE athletes SET full_name=$n,birth_date=$b,gender=$g,region=$r,organization=$o,team=$t,coach=$c,rank=$rk,discipline=$d,age_group=$a,weight_category=$w,declared_weight=$dw,category_id=$cid WHERE id=$id";
         q.Parameters.AddWithValue("$n",NameNormalizer.Normalize(fullName));q.Parameters.AddWithValue("$b",birth);q.Parameters.AddWithValue("$g",gender);q.Parameters.AddWithValue("$r",region);q.Parameters.AddWithValue("$o",organization);q.Parameters.AddWithValue("$t",team);q.Parameters.AddWithValue("$c",coach);q.Parameters.AddWithValue("$rk",rank);q.Parameters.AddWithValue("$d",discipline);q.Parameters.AddWithValue("$a",age);q.Parameters.AddWithValue("$w",weight);q.Parameters.AddWithValue("$dw",(object?)declaredWeight??DBNull.Value);q.Parameters.AddWithValue("$cid",(object?)categoryId??DBNull.Value);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Изменена карточка спортсмена {id}");
     }
     public bool DeleteAthleteIfUnused(long id){
         using var c=Open();using(var q=c.CreateCommand()){q.CommandText="SELECT COUNT(*) FROM bouts WHERE red_id=$id OR blue_id=$id OR winner_id=$id";q.Parameters.AddWithValue("$id",id);if(Convert.ToInt32(q.ExecuteScalar())>0)return false;}
         using(var q=c.CreateCommand()){q.CommandText="DELETE FROM athletes WHERE id=$id";q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();}Audit($"Удалён спортсмен {id}");return true;
     }
-    public void UpdateAthleteStatus(long id,string status){using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET status=$s WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Статус спортсмена {id}: {status}");}
-    public void SetWeigh(long id,double kg,string status="Допущен"){using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET actual_weight=$w,status=$s WHERE id=$id";q.Parameters.AddWithValue("$w",kg);q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Взвешивание {id}: {kg} кг, {status}");}
-    public void AssignCategory(long id,long? categoryId){using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET category_id=$c WHERE id=$id";q.Parameters.AddWithValue("$c",(object?)categoryId??DBNull.Value);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();}
+    public void UpdateAthleteStatus(long id,string status){using var c=Open();EnsureEligibilityUnlocked(c,id);using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET status=$s WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Статус спортсмена {id}: {status}");}
+    public void SetWeigh(long id,double kg,string status="Допущен"){using var c=Open();EnsureEligibilityUnlocked(c,id);using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET actual_weight=$w,status=$s WHERE id=$id";q.Parameters.AddWithValue("$w",kg);q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Взвешивание {id}: {kg} кг, {status}");}
+    public void AssignCategory(long id,long? categoryId){
+        using var c=Open();var old=AthleteCompetitionFields(c,id);
+        if(old.CategoryId==categoryId)return;
+        if(CategoryApproved(c,old.CategoryId)||CategoryApproved(c,categoryId))throw new InvalidOperationException("Нельзя переносить спортсмена из/в категорию с утверждённой жеребьёвкой.");
+        using(var chk=c.CreateCommand()){chk.CommandText="SELECT COUNT(*) FROM bouts WHERE red_id=$id OR blue_id=$id OR winner_id=$id";chk.Parameters.AddWithValue("$id",id);if(Convert.ToInt32(chk.ExecuteScalar())>0)throw new InvalidOperationException("Нельзя перенести спортсмена: он уже включён в поединки.");}
+        using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET category_id=$c WHERE id=$id";q.Parameters.AddWithValue("$c",(object?)categoryId??DBNull.Value);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Спортсмен {id} перенесён в категорию {categoryId?.ToString()??"без категории"}");
+    }
     public List<Athlete> Athletes(long? categoryId=null){
         using var c=Open();using var q=c.CreateCommand();
         q.CommandText=@"SELECT id,full_name,COALESCE(birth_date,''),COALESCE(gender,''),COALESCE(region,''),COALESCE(organization,''),COALESCE(team,''),COALESCE(coach,''),COALESCE(rank,''),

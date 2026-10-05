@@ -219,16 +219,33 @@ public sealed partial class MainForm{
     IEnumerable<string> CategoryLines(long cid){
         var c=db.Categories().First(x=>x.Id==cid);var lines=new List<string>();lines.AddRange(HeaderLines());lines.Add($"{c.Discipline}; {c.Gender}; {c.AgeGroup}; {c.WeightCategory}; система: {c.System}; утешительные: {c.Repechage}");lines.Add("");
         lines.Add("ЖЕРЕБЬЁВКА:");lines.AddRange(db.DrawPositions(cid).Select(x=>$"{x.Position}. {(x.Athlete==""?"СВОБОДНО":x.Athlete)} {(x.Group!=""?$"[{x.Group}]":"")}"));lines.Add("");lines.Add("ПОЕДИНКИ:");
-        lines.AddRange(db.Bouts(cid).Select(b=>$"№{b.BoutNo} {b.Stage}: {b.RedName} — {b.BlueName}; {(b.Status=="Завершён"?$"{b.RedScore}:{b.BlueScore}, победитель {b.WinnerName}, {b.Reason}":"не проведён")}; судьи: {b.Judges}"));return lines;
+        var rules=db.BoutRules(cid).ToDictionary(x=>x.Id);
+        foreach(var b in db.Bouts(cid)){
+            var r=rules[b.Id];string result=b.Status=="Завершён"?$"{b.RedScore}:{b.BlueScore}; классификация {r.ResultCode} ({r.RedClass}:{r.BlueClass}); время {r.DurationSeconds/60}:{r.DurationSeconds%60:00}; победитель {b.WinnerName}; {b.Reason}":"не проведён";
+            lines.Add($"№{b.BoutNo} {b.Stage}: {b.RedName} — {b.BlueName}; {result}; ковёр {b.Mat}; судьи: {b.Judges}");
+        }
+        var places=db.Placements(cid);if(places.Count>0){lines.Add("");lines.Add("ИТОГОВЫЕ МЕСТА:");lines.AddRange(places.Select(p=>$"{p.Place} место — {p.Athlete} | {p.Team} | {p.Source}"));}
+        return lines;
     }
     IEnumerable<string> SummaryLines(){
         var lines=new List<string>();lines.AddRange(HeaderLines());lines.Add($"Всего участников: {db.Athletes().Count}");lines.Add($"Всего категорий: {db.Categories().Count}");lines.Add($"Судей: {db.Judges().Count}");lines.Add("");
-        foreach(var c in db.Categories()){lines.Add($"{c.Discipline} | {c.Gender} | {c.AgeGroup} | {c.WeightCategory} | {c.Status}");var final=db.Bouts(c.Id).FirstOrDefault(b=>b.Stage=="Финал"&&b.Status=="Завершён");if(final!=null)lines.Add($"  Победитель: {final.WinnerName} ({final.Reason})");}
+        foreach(var c in db.Categories()){
+            lines.Add($"{c.Discipline} | {c.Gender} | {c.AgeGroup} | {c.WeightCategory} | {c.Status}");
+            var places=db.Placements(c.Id);if(places.Count>0)foreach(var p in places.Where(x=>x.Place<=5))lines.Add($"  {p.Place} место: {p.Athlete} ({p.Team})");
+            else{var final=db.Bouts(c.Id).FirstOrDefault(b=>b.Stage=="Финал"&&b.Status=="Завершён");if(final!=null)lines.Add($"  Финал завершён, итоговые места ещё не рассчитаны. Победитель: {final.WinnerName}");}
+        }
         return lines;
     }
 
     void PrintLines(string title,IEnumerable<string> source){
-        var lines=source.ToList();int index=0;var pd=new PrintDocument();pd.DocumentName=title;
+        var lines=source.ToList();int index=0;
+        try{
+            var dir=Path.Combine(root,"Protocols");Directory.CreateDirectory(dir);
+            var invalid=Path.GetInvalidFileNameChars();var safe=new string(title.Select(ch=>invalid.Contains(ch)?'_':ch).ToArray());
+            var path=Path.Combine(dir,$"{DateTime.Now:yyyyMMdd_HHmmss_fff}_{safe}.txt");
+            File.WriteAllLines(path,new[]{title}.Concat(lines),System.Text.Encoding.UTF8);db.Audit($"Сформирован снимок протокола: {Path.GetFileName(path)}");
+        }catch{}
+        var pd=new PrintDocument();pd.DocumentName=title;
         pd.PrintPage+=(s,e)=>{float y=e.MarginBounds.Top;using var head=new Font("Arial",14,FontStyle.Bold);using var font=new Font("Arial",9);e.Graphics!.DrawString(title,head,Brushes.Black,e.MarginBounds.Left,y);y+=34;
             while(index<lines.Count&&y<e.MarginBounds.Bottom-18){e.Graphics.DrawString(lines[index++],font,Brushes.Black,new RectangleF(e.MarginBounds.Left,y,e.MarginBounds.Width,40));y+=20;}e.HasMorePages=index<lines.Count;};
         using var dlg=new PrintPreviewDialog{Document=pd,Width=1100,Height=800};dlg.ShowDialog(this);

@@ -8,8 +8,8 @@ public sealed partial class MainForm{
     void BuildTournamentTab(){
         var page=Page("Турнир");
         var p=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(18),MaximumSize=new Size(900,0)};
-        AddField(p,"Название соревнования",tName);AddField(p,"Место проведения",tPlace);AddField(p,"Дата начала",tStart);AddField(p,"Дата окончания",tEnd);AddField(p,"Количество ковров",tMats);AddField(p,"Главный судья",tChiefRef);AddField(p,"Главный секретарь",tChiefSec);AddField(p,"Командные очки 1/2/3/5-е места",tTeamScheme);
-        var save=Btn("Сохранить данные турнира",(s,e)=>{db.SaveTournament(tName.Text,tPlace.Text,tStart.Text,tEnd.Text,(int)tMats.Value,tChiefRef.Text,tChiefSec.Text,tTeamScheme.Text);AutoBackup();MessageBox.Show("Данные турнира сохранены.");ReloadAll();});
+        AddField(p,"Название соревнования",tName);AddField(p,"Место проведения",tPlace);AddField(p,"Дата начала",tStart);AddField(p,"Дата окончания",tEnd);AddField(p,"Количество ковров",tMats);AddField(p,"Главный судья",tChiefRef);AddField(p,"Главный секретарь",tChiefSec);AddField(p,"Командные очки 1/2/3/5-е места",tTeamScheme);AddField(p,"Дополнительная шапка протоколов",tProtocolHeader);AddField(p,"Подвал / примечание протоколов",tProtocolFooter);
+        var save=Btn("Сохранить данные турнира",(s,e)=>{db.SaveTournament(tName.Text,tPlace.Text,tStart.Text,tEnd.Text,(int)tMats.Value,tChiefRef.Text,tChiefSec.Text,tTeamScheme.Text,tProtocolHeader.Text,tProtocolFooter.Text);AutoBackup();MessageBox.Show("Данные турнира сохранены.");ReloadAll();});
         var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true};
         buttons.Controls.Add(save);buttons.Controls.Add(Btn("Новый турнир",NewTournamentClick));buttons.Controls.Add(Btn("Открыть архив",OpenTournamentArchiveClick));
         p.Controls.Add(buttons,1,p.RowCount);int rr=p.RowCount++;p.Controls.Add(tournamentStats,0,rr);p.SetColumnSpan(tournamentStats,2);page.Controls.Add(p);
@@ -45,7 +45,7 @@ public sealed partial class MainForm{
     }
 
     static void AddField(TableLayoutPanel p,string label,Control c){int r=p.RowCount++;p.RowStyles.Add(new RowStyle(SizeType.AutoSize));p.Controls.Add(new Label{Text=label,AutoSize=true,Margin=new Padding(3,10,15,3)},0,r);c.Dock=DockStyle.Fill;c.Width=500;p.Controls.Add(c,1,r);}
-    void LoadTournament(){var t=db.GetTournament();tName.Text=t.Name;tPlace.Text=t.Place;tStart.Text=t.StartDate;tEnd.Text=t.EndDate;tMats.Value=Math.Clamp(t.Mats,1,6);tChiefRef.Text=t.ChiefReferee;tChiefSec.Text=t.ChiefSecretary;tTeamScheme.Text=t.TeamScheme;}
+    void LoadTournament(){var t=db.GetTournament();tName.Text=t.Name;tPlace.Text=t.Place;tStart.Text=t.StartDate;tEnd.Text=t.EndDate;tMats.Value=Math.Clamp(t.Mats,1,6);tChiefRef.Text=t.ChiefReferee;tChiefSec.Text=t.ChiefSecretary;tTeamScheme.Text=t.TeamScheme;tProtocolHeader.Text=t.ProtocolHeader;tProtocolFooter.Text=t.ProtocolFooter;}
 
     void BuildCategoriesTab(){
         var page=Page("Категории");

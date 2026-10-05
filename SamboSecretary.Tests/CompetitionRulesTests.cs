@@ -5,7 +5,7 @@ using SamboSecretary;
 
 public class CompetitionRulesTests{
     static BoutRuleRow B(long id,int no,long red,long blue,long winner,string code,int rc,int bc,int rs=0,int bs=0,int sec=0,bool clean=false,string stage="Круг 1")
-        =>new(id,1,no,stage,red,blue,"Завершён",rs,bs,winner,code,rc,bc,sec,clean,"");
+        =>new(id,1,no,stage,red,blue,"Завершён",rs,bs,winner,code,rc,bc,sec,clean,0,0,0,0,0,0,"");
 
     [Theory]
     [InlineData("Чистая победа",8,0,true,"4:0",4,0)]
@@ -48,6 +48,16 @@ public class CompetitionRulesTests{
         };
         Assert.Equal(new long[]{2,3},CompetitionRules.DirectLossesTo(1,bouts,false));
         Assert.Equal(new long[]{2,3,4},CompetitionRules.DirectLossesTo(1,bouts,true));
+    }
+
+    [Fact]
+    public void TechnicalQualityBreaksOtherwiseEqualTie(){
+        var a=new BoutRuleRow(1,1,1,"Круг 1",1,3,"Завершён",4,2,1,"3:1",3,1,240,false,1,0,0,0,1,0,"");
+        var b=new BoutRuleRow(2,1,2,"Круг 1",2,4,"Завершён",4,2,2,"3:1",3,1,240,false,0,2,0,0,1,0,"");
+        var c1=new BoutRuleRow(3,1,3,"Круг 1",1,2,"Завершён",1,2,2,"3:1",1,3,240,false,0,0,1,0,1,0,"");
+        var c2=new BoutRuleRow(4,1,4,"Круг 1",3,4,"Завершён",2,1,3,"3:1",3,1,240,false,0,1,0,0,0,1,"");
+        var r=CompetitionRules.RankRoundRobin(new long[]{1,2,3,4},new[]{a,b,c1,c2});
+        Assert.True(r.Ordered.IndexOf(1)<r.Ordered.IndexOf(2));
     }
 
     [Fact]

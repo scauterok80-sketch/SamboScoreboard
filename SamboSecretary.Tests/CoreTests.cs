@@ -20,7 +20,7 @@ public void OlympicDrawHasNoByeByePairs(int n,int size){
 [Fact]
 public void SeededDrawRejectsImpossibleByeLayout(){
  var ids=Enumerable.Range(1,9).Select(x=>(long)x).ToList();
- var seeded=new Dictionary<long,int>{{1,1},{2,2}};
+ var seeded=new Dictionary<long,int>{{1,1},{2,2},{3,3},{4,4}};
  Assert.Throws<ArgumentException>(()=>TournamentEngine.Draw(ids,16,DrawMode.SeededAuto,seeded,42));
 }
 }

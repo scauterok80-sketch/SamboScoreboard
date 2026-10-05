@@ -7,4 +7,20 @@ public class CoreTests{
 [Fact]public void Cross(){var x=TournamentEngine.MixedSemis(1,2,3,4);Assert.Equal((1L,4L),(x.Item1.Red!.Value,x.Item1.Blue!.Value));Assert.Equal((3L,2L),(x.Item2.Red!.Value,x.Item2.Blue!.Value));}
 [Fact]public void SeededStays(){var ids=Enumerable.Range(1,10).Select(x=>(long)x).ToList();var d=TournamentEngine.Draw(ids,16,DrawMode.SeededAuto,new Dictionary<long,int>{{1,1},{2,16}},42);Assert.Equal(1,d[0]);Assert.Equal(2,d[15]);Assert.Equal(10,d.Count(x=>x!=null));}
 [Fact]public void Systems(){Assert.Equal(new[]{TournamentSystem.RoundRobin,TournamentSystem.Mixed},TournamentEngine.Allowed(5));Assert.Equal(new[]{TournamentSystem.Mixed},TournamentEngine.Allowed(7));Assert.Equal(new[]{TournamentSystem.Olympic},TournamentEngine.Allowed(8));}
+
+[Theory]
+[InlineData(9,16)][InlineData(10,16)][InlineData(15,16)][InlineData(17,32)][InlineData(18,32)][InlineData(31,32)]
+public void OlympicDrawHasNoByeByePairs(int n,int size){
+ var ids=Enumerable.Range(1,n).Select(x=>(long)x).ToList();
+ var d=TournamentEngine.Draw(ids,size,DrawMode.FullAuto,null,42);
+ for(int i=0;i<size;i+=2)Assert.True(d[i].HasValue||d[i+1].HasValue);
+ int realMatches=Enumerable.Range(0,size/2).Count(p=>d[p*2].HasValue&&d[p*2+1].HasValue);
+ Assert.Equal(n-size/2,realMatches);
+}
+[Fact]
+public void SeededDrawRejectsImpossibleByeLayout(){
+ var ids=Enumerable.Range(1,9).Select(x=>(long)x).ToList();
+ var seeded=new Dictionary<long,int>{{1,1},{2,2}};
+ Assert.Throws<ArgumentException>(()=>TournamentEngine.Draw(ids,16,DrawMode.SeededAuto,seeded,42));
+}
 }

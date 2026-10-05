@@ -87,28 +87,33 @@ public sealed partial class MainForm{
         if(final==null||final.Status!="Завершён"||semis.Count!=2||semis.Any(b=>b.Status!="Завершён"))throw new InvalidOperationException("Сначала завершите полуфиналы и финал.");
         long champion=final.WinnerId!.Value,silver=final.RedId==champion?final.BlueId!.Value:final.RedId!.Value;
         var semiLosers=semis.Select(s=>s.RedId==s.WinnerId?s.BlueId!.Value:s.RedId!.Value).ToList();
-        db.ClearPlacements(cid);db.SavePlacement(cid,champion,1,"Победитель финала");db.SavePlacement(cid,silver,2,"Финалист");
-        var placed=new HashSet<long>{champion,silver};
+        db.ClearPlacements(cid);db.SavePlacement(cid,champion,1,"Победитель финала");
+        var placed=new HashSet<long>{champion};
+        if(!CompetitionRules.IsDisqualified(silver,bouts)){db.SavePlacement(cid,silver,2,"Финалист");placed.Add(silver);}else db.Audit($"Финалист {silver} не получает место из-за дисквалификации");
 
         if(cat.Repechage=="Без утешительных встреч"){
-            foreach(var id in semiLosers){db.SavePlacement(cid,id,3,"Проигравший полуфинал — без утешительных");placed.Add(id);}
+            foreach(var id in semiLosers){
+                if(CompetitionRules.IsDisqualified(id,bouts)){db.Audit($"Полуфиналист {id} не получает место из-за дисквалификации");continue;}
+                db.SavePlacement(cid,id,3,"Проигравший полуфинал — без утешительных");placed.Add(id);
+            }
         }else{
             var bronze=bouts.Where(b=>b.Stage.StartsWith("Бронза")).OrderBy(b=>b.BoutNo).ToList();
             if(bronze.Any(b=>b.Status!="Завершён"))throw new InvalidOperationException("Сначала завершите все бронзовые встречи.");
             foreach(var br in bronze){
                 if(!br.WinnerId.HasValue)continue;long loser=br.RedId==br.WinnerId?br.BlueId!.Value:br.RedId!.Value;
-                db.SavePlacement(cid,br.WinnerId.Value,3,"Победитель бронзовой встречи");db.SavePlacement(cid,loser,5,"Проигравший бронзовую встречу");placed.Add(br.WinnerId.Value);placed.Add(loser);
+                db.SavePlacement(cid,br.WinnerId.Value,3,"Победитель бронзовой встречи");placed.Add(br.WinnerId.Value);
+                if(!CompetitionRules.IsDisqualified(loser,bouts)){db.SavePlacement(cid,loser,5,"Проигравший бронзовую встречу");placed.Add(loser);}else db.Audit($"Проигравший бронзовой встречи {loser} исключён из мест из-за дисквалификации");
             }
             foreach(var sl in semiLosers.Where(x=>!placed.Contains(x))){
                 bool hasBronze=bronze.Any(x=>x.RedId==sl||x.BlueId==sl);
-                if(!hasBronze){db.SavePlacement(cid,sl,3,"Бронза без соперника по утешительной ветке");placed.Add(sl);}
+                if(!hasBronze&&!CompetitionRules.IsDisqualified(sl,bouts)){db.SavePlacement(cid,sl,3,"Бронза без соперника по утешительной ветке");placed.Add(sl);}
             }
         }
 
         var allIds=db.Athletes(cid).Select(a=>a.Id).ToList();
         var disqualified=allIds.Where(id=>CompetitionRules.IsDisqualified(id,bouts)).ToHashSet();
         var remaining=allIds.Where(id=>!placed.Contains(id)&&!disqualified.Contains(id)).ToList();
-        int nextPlace=placed.Count+1;
+        int nextPlace=cat.Repechage=="Без утешительных встреч"?5:7;
 
         if(cat.Repechage!="Без утешительных встреч"){
             var depths=CompetitionRules.ConsolationLossDepth(bouts);

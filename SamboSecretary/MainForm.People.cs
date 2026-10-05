@@ -52,7 +52,7 @@ public sealed partial class MainForm{
         var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=48,Padding=new Padding(4)};
         bar.Controls.Add(Btn("Добавить категорию",AddCategoryClick));
         bar.Controls.Add(Btn("Редактировать выбранную",EditCategoryClick));
-        bar.Controls.Add(Btn("Удалить выбранную",(s,e)=>{var id=SelectedId(categoryGrid);if(!id.HasValue)return;if(MessageBox.Show("Удалить выбранную категорию?","Подтверждение",MessageBoxButtons.YesNo)==DialogResult.Yes){db.DeleteCategory(id.Value);ReloadAll();}}));
+        bar.Controls.Add(Btn("Удалить выбранную",(s,e)=>{var id=SelectedId(categoryGrid);if(!id.HasValue)return;if(MessageBox.Show("Удалить выбранную категорию?","Подтверждение",MessageBoxButtons.YesNo)==DialogResult.Yes)UiGuard(()=>{db.DeleteCategory(id.Value);ReloadAll();},"Категория не удалена");}));
         page.Controls.Add(categoryGrid);page.Controls.Add(bar);
     }
     void AddCategoryClick(object? s,EventArgs e){
@@ -83,7 +83,7 @@ public sealed partial class MainForm{
         bar.Controls.Add(Btn("Создать Excel-шаблон",(s,e)=>{using var save=new SaveFileDialog{Filter="Excel (*.xlsx)|*.xlsx",FileName="Заявка_Самбо.xlsx"};if(save.ShowDialog(this)==DialogResult.OK){ExcelImporter.CreateTemplate(save.FileName);MessageBox.Show("Шаблон сохранён.");}}));
         bar.Controls.Add(new Label{Text="Назначить категорию:",AutoSize=true,Margin=new Padding(15,12,4,0)});
         bar.Controls.Add(assignCategory);
-        bar.Controls.Add(Btn("Назначить",(s,e)=>{var id=SelectedId(athleteGrid);var cid=SelectedCategory(assignCategory);if(id.HasValue&&cid.HasValue){db.AssignCategory(id.Value,cid.Value);ReloadAll();}}));
+        bar.Controls.Add(Btn("Назначить",(s,e)=>{var id=SelectedId(athleteGrid);var cid=SelectedCategory(assignCategory);if(id.HasValue&&cid.HasValue)UiGuard(()=>{db.AssignCategory(id.Value,cid.Value);ReloadAll();},"Категория не изменена");}));
         page.Controls.Add(athleteGrid);page.Controls.Add(bar);
     }
     void AddAthleteClick(object? s,EventArgs e){
@@ -100,7 +100,7 @@ public sealed partial class MainForm{
         d.Age.Text=a.AgeGroup;d.Weight.Text=a.WeightCategory;d.DeclaredWeight.Text=a.DeclaredWeight?.ToString(System.Globalization.CultureInfo.InvariantCulture)??"";
         if(d.ShowDialog(this)!=DialogResult.OK||string.IsNullOrWhiteSpace(d.FullName.Text))return;
         long? cid=FindCategory(d.Discipline.Text,d.Gender.Text,d.Age.Text,d.Weight.Text)??a.CategoryId;
-        db.UpdateAthlete(a.Id,d.FullName.Text,d.Birth.Text,d.Gender.Text,d.Region.Text,d.Organization.Text,d.Team.Text,d.Coach.Text,d.Rank.Text,d.Discipline.Text,d.Age.Text,d.Weight.Text,ParseDouble(d.DeclaredWeight.Text),cid);AutoBackup();ReloadAll();
+        UiGuard(()=>{db.UpdateAthlete(a.Id,d.FullName.Text,d.Birth.Text,d.Gender.Text,d.Region.Text,d.Organization.Text,d.Team.Text,d.Coach.Text,d.Rank.Text,d.Discipline.Text,d.Age.Text,d.Weight.Text,ParseDouble(d.DeclaredWeight.Text),cid);AutoBackup();ReloadAll();},"Карточка не изменена");
     }
     void DeleteAthleteClick(object? s,EventArgs e){
         var id=SelectedId(athleteGrid);if(!id.HasValue)return;
@@ -171,9 +171,9 @@ public sealed partial class MainForm{
                 if(ans==DialogResult.No)decision="Ожидает решения";
                 db.Audit($"Предупреждение по весу: {a.FullName}, категория {a.WeightCategory}, фактический вес {v.Value:0.##}; решение: {decision}");
             }
-            db.SetWeigh(id.Value,v.Value,decision);AutoBackup();ReloadAll();
+            UiGuard(()=>{db.SetWeigh(id.Value,v.Value,decision);AutoBackup();ReloadAll();},"Взвешивание не изменено");
         }));
-        bar.Controls.Add(Btn("Изменить только допуск",(s,e)=>{var id=SelectedId(weighGrid);if(id.HasValue){db.UpdateAthleteStatus(id.Value,status.Text);ReloadAll();}}));
+        bar.Controls.Add(Btn("Изменить только допуск",(s,e)=>{var id=SelectedId(weighGrid);if(id.HasValue)UiGuard(()=>{db.UpdateAthleteStatus(id.Value,status.Text);ReloadAll();},"Допуск не изменён");}));
         page.Controls.Add(weighGrid);page.Controls.Add(bar);
     }
     void ReloadWeigh(){weighGrid.DataSource=db.Athletes().Select(x=>new{ID=x.Id,ФИО=x.FullName,Категория=x.WeightCategory,Заявленный=x.DeclaredWeight,Фактический=x.ActualWeight,Статус=x.Status,Команда=x.Team}).ToList();}

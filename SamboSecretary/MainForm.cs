@@ -28,7 +28,7 @@ public sealed partial class MainForm:Form{
     public MainForm(){
         Text="Самбо-секретарь 2.0";WindowState=FormWindowState.Maximized;MinimumSize=new Size(1100,700);
         db=new Database(Path.Combine(root,"sambo.db"));
-        BuildTournamentTab();BuildCategoriesTab();BuildAthletesTab();BuildWeighTab();BuildJudgesTab();BuildDrawTab();BuildBoutsTab();BuildResultsTab();BuildDocumentsTab();BuildAuditTab();
+        BuildTournamentTab();BuildCategoriesTab();BuildAthletesTab();BuildWeighTab();BuildJudgesTab();BuildDrawTab();BuildBoutsTab();BuildMatsTab();BuildResultsTab();BuildDocumentsTab();BuildAuditTab();
         Controls.Add(tabs);LoadTournament();ReloadAll();
     }
 
@@ -41,7 +41,7 @@ public sealed partial class MainForm:Form{
     TabPage Page(string title){var p=new TabPage(title);tabs.TabPages.Add(p);return p;}
 
     void ReloadAll(){
-        ReloadCategories();ReloadAthletes();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadJudgeAssignments();ReloadDraw();ReloadBouts();ReloadResults();ReloadAudit();
+        ReloadCategories();ReloadAthletes();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadJudgeAssignments();ReloadDraw();ReloadBouts();ReloadMats();ReloadResults();ReloadAudit();
     }
 
     void ReloadCategoryChoices(){

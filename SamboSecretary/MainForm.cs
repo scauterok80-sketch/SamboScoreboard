@@ -12,6 +12,7 @@ public sealed partial class MainForm:Form{
 
     readonly DataGridView categoryGrid=Grid();
     readonly DataGridView athleteGrid=Grid();
+    readonly DataGridView admissionGrid=Grid();
     readonly DataGridView weighGrid=Grid();
     readonly DataGridView judgeGrid=Grid();
     readonly DataGridView drawGrid=Grid();
@@ -29,7 +30,7 @@ public sealed partial class MainForm:Form{
     public MainForm(){
         Text="Самбо-секретарь 2.0";WindowState=FormWindowState.Maximized;MinimumSize=new Size(1100,700);
         db=new Database(Path.Combine(root,"sambo.db"));
-        BuildTournamentTab();BuildCategoriesTab();BuildAthletesTab();BuildWeighTab();BuildJudgesTab();BuildDrawTab();BuildBoutsTab();BuildMatsTab();BuildResultsTab();BuildDocumentsTab();BuildAuditTab();
+        BuildTournamentTab();BuildCategoriesTab();BuildAthletesTab();BuildAdmissionTab();BuildWeighTab();BuildJudgesTab();BuildDrawTab();BuildBoutsTab();BuildMatsTab();BuildResultsTab();BuildDocumentsTab();BuildAuditTab();
         Controls.Add(tabs);LoadTournament();ReloadAll();ShowResumeNotice();
     }
 
@@ -54,7 +55,7 @@ public sealed partial class MainForm:Form{
     TabPage Page(string title){var p=new TabPage(title);tabs.TabPages.Add(p);return p;}
 
     void ReloadAll(){
-        ReloadDashboard();ReloadCategories();ReloadAthletes();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadJudgeAssignments();ReloadDraw();ReloadBouts();ReloadMats();ReloadResults();ReloadAudit();
+        ReloadDashboard();ReloadCategories();ReloadAthletes();ReloadAdmission();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadJudgeAssignments();ReloadDraw();ReloadBouts();ReloadMats();ReloadResults();ReloadAudit();
     }
 
     void ReloadCategoryChoices(){

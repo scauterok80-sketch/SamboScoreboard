@@ -24,6 +24,7 @@ public sealed partial class MainForm:Form{
     readonly ComboBox drawSystem=new(){DropDownStyle=ComboBoxStyle.DropDownList,Width=170};
     readonly ComboBox drawMode=new(){DropDownStyle=ComboBoxStyle.DropDownList,Width=210};
     readonly ComboBox drawRepechage=new(){DropDownStyle=ComboBoxStyle.DropDownList,Width=220};
+    readonly CheckBox separateTeams=new(){Text="Развести одну команду (если возможно)",AutoSize=true};
 
     public MainForm(){
         Text="Самбо-секретарь 2.0";WindowState=FormWindowState.Maximized;MinimumSize=new Size(1100,700);

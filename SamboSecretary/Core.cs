@@ -35,7 +35,10 @@ public static class TournamentEngine {
   if(size<2||size%2!=0)throw new ArgumentException("Некорректный размер сетки");
   var slots=Enumerable.Repeat<long?>(null,size).ToList();seeded??=new Dictionary<long,int>();
   foreach(var kv in seeded){if(kv.Value<1||kv.Value>size||slots[kv.Value-1]!=null||!ids.Contains(kv.Key))throw new ArgumentException("Некорректный посев");slots[kv.Value-1]=kv.Key;}
-  if(mode==DrawMode.Manual)return slots;
+  if(mode==DrawMode.Manual){
+   if(ids.Count>=size/2&&Enumerable.Range(0,size/2).Any(p=>slots[p*2]==null&&slots[p*2+1]==null))throw new ArgumentException("Ручная расстановка создаёт пустую пару BYE–BYE. Распределите спортсменов по всем парам первого круга.");
+   return slots;
+  }
   var rng=new Random(seed);var rest=ids.Where(x=>!seeded.ContainsKey(x)).OrderBy(_=>rng.Next()).ToList();
   var emptyPairs=Enumerable.Range(0,size/2).Where(p=>slots[p*2]==null&&slots[p*2+1]==null).OrderBy(_=>rng.Next()).ToList();
   if(rest.Count<emptyPairs.Count)throw new ArgumentException("Фиксированный посев создаёт пустую пару BYE–BYE. Измените позиции сеяных спортсменов.");

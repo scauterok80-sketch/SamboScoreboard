@@ -178,9 +178,9 @@ public sealed partial class MainForm{
 
     void AdvanceOlympic(long cid){
         var pos=db.DrawPositions(cid);if(pos.Count==0)return;int size=pos.Count;var stages=size==8?new[]{"1/4","Полуфинал","Финал"}:size==16?new[]{"1/8","1/4","Полуфинал","Финал"}:new[]{"1/16","1/8","1/4","Полуфинал","Финал"};
-        var all=db.Bouts(cid);string current=stages.LastOrDefault(s=>all.Any(b=>b.Stage==s))??stages[0];int idx=Array.IndexOf(stages,current);if(idx>=stages.Length-1){MessageBox.Show("Финал уже сформирован.");return;}
+        var all=db.Bouts(cid);string current=stages.LastOrDefault(s=>all.Any(b=>b.Stage==s))??stages[0];int idx=Array.IndexOf(stages,current);if(idx>=stages.Length-1){ProgressOlympicRepechage(cid);return;}
         var curBouts=all.Where(b=>b.Stage==current).OrderBy(b=>b.BoutNo).ToList();if(curBouts.Any(b=>b.Status!="Завершён")){MessageBox.Show($"Сначала завершите все встречи этапа {current}.");return;}
-        string next=stages[idx+1];if(all.Any(b=>b.Stage==next)){MessageBox.Show($"Этап {next} уже создан.");return;}
+        string next=stages[idx+1];if(all.Any(b=>b.Stage==next)){if(next=="Финал")ProgressOlympicRepechage(cid);return;}
         List<long> survivors=new();
         if(idx==0){
             for(int i=0;i<pos.Count;i+=2){
@@ -192,6 +192,8 @@ public sealed partial class MainForm{
         }else survivors=curBouts.Where(x=>x.WinnerId.HasValue).Select(x=>x.WinnerId!.Value).ToList();
         int no=all.Count==0?1:all.Max(x=>x.BoutNo)+1,mat=1;for(int i=0;i+1<survivors.Count;i+=2){db.AddBout(cid,no++,next,survivors[i],survivors[i+1],mat);mat=mat%(int)tMats.Value+1;}
         db.Audit($"Создан этап {next} олимпийской системы категории {cid}");
+        if(next=="Финал")ProgressOlympicRepechage(cid);
+        AutoBackup();
     }
 
     void BuildDocumentsTab(){

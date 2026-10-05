@@ -7,6 +7,7 @@ public record Tournament(long Id,string Name,string Place,string StartDate,strin
 public record CategoryRow(long Id,string Discipline,string Gender,string AgeGroup,string WeightCategory,string System,string Repechage,string DrawMode,bool DrawApproved,string Status);
 public record Athlete(long Id,string FullName,string BirthDate,string Gender,string Region,string Organization,string Team,string Coach,string Rank,string Discipline,string AgeGroup,string WeightCategory,double? DeclaredWeight,double? ActualWeight,string Status,long? CategoryId);
 public record JudgeRow(long Id,string Name,string Region,string Category,string Role);
+public record JudgeAssignmentRow(long Id,long CategoryId,long JudgeId,string JudgeName,int Mat,string Role);
 public record BoutRow(long Id,long CategoryId,int BoutNo,string Stage,long? RedId,string RedName,long? BlueId,string BlueName,int Mat,string Status,int? RedScore,int? BlueScore,long? WinnerId,string WinnerName,string Reason,string Judges);
 public record BoutRuleRow(long Id,long CategoryId,int BoutNo,string Stage,long? RedId,long? BlueId,string Status,int RedScore,int BlueScore,long? WinnerId,string ResultCode,int RedClass,int BlueClass,int DurationSeconds,bool IsClean,string Reason);
 public record PlacementRow(long AthleteId,string Athlete,string Team,string Region,int Place,string Source);
@@ -34,6 +35,10 @@ public sealed class Database {
 
         CREATE TABLE IF NOT EXISTS judges(
             id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,region TEXT,category TEXT,role TEXT);
+
+        CREATE TABLE IF NOT EXISTS judge_assignments(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,category_id INTEGER NOT NULL,judge_id INTEGER NOT NULL,mat INTEGER DEFAULT 1,role TEXT DEFAULT '',
+            UNIQUE(category_id,judge_id,mat,role));
 
         CREATE TABLE IF NOT EXISTS draw_positions(
             id INTEGER PRIMARY KEY AUTOINCREMENT,category_id INTEGER NOT NULL,position INTEGER NOT NULL,athlete_id INTEGER,group_name TEXT DEFAULT '');
@@ -143,6 +148,15 @@ public sealed class Database {
         var id=(long)q.ExecuteScalar()!;Audit("Добавлен судья "+NameNormalizer.Normalize(name));return id;
     }
     public List<JudgeRow> Judges(){using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT id,name,COALESCE(region,''),COALESCE(category,''),COALESCE(role,'') FROM judges ORDER BY name";using var r=q.ExecuteReader();var x=new List<JudgeRow>();while(r.Read())x.Add(new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4)));return x;}
+    public void AssignJudge(long categoryId,long judgeId,int mat,string role){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="INSERT OR IGNORE INTO judge_assignments(category_id,judge_id,mat,role) VALUES($c,$j,$m,$r)";
+        q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$j",judgeId);q.Parameters.AddWithValue("$m",mat);q.Parameters.AddWithValue("$r",role);q.ExecuteNonQuery();Audit($"Назначен судья {judgeId} в категорию {categoryId}, ковёр {mat}, роль {role}");
+    }
+    public void RemoveJudgeAssignment(long id){using var c=Open();using var q=c.CreateCommand();q.CommandText="DELETE FROM judge_assignments WHERE id=$id";q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Удалено судейское назначение {id}");}
+    public List<JudgeAssignmentRow> JudgeAssignments(long? categoryId=null){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText=@"SELECT ja.id,ja.category_id,ja.judge_id,j.name,ja.mat,COALESCE(ja.role,j.role,'') FROM judge_assignments ja JOIN judges j ON j.id=ja.judge_id "+(categoryId.HasValue?"WHERE ja.category_id=$c ":"")+"ORDER BY ja.category_id,ja.mat,ja.role,j.name";
+        if(categoryId.HasValue)q.Parameters.AddWithValue("$c",categoryId.Value);using var r=q.ExecuteReader();var x=new List<JudgeAssignmentRow>();while(r.Read())x.Add(new(r.GetInt64(0),r.GetInt64(1),r.GetInt64(2),r.GetString(3),r.GetInt32(4),r.GetString(5)));return x;
+    }
 
     public void ClearDrawPositions(long categoryId){using var c=Open();using var q=c.CreateCommand();q.CommandText="DELETE FROM draw_positions WHERE category_id=$c";q.Parameters.AddWithValue("$c",categoryId);q.ExecuteNonQuery();}
     public void AddDrawPosition(long categoryId,int position,long? athleteId,string groupName=""){using var c=Open();using var q=c.CreateCommand();q.CommandText="INSERT INTO draw_positions(category_id,position,athlete_id,group_name) VALUES($c,$p,$a,$g)";q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$p",position);q.Parameters.AddWithValue("$a",(object?)athleteId??DBNull.Value);q.Parameters.AddWithValue("$g",groupName);q.ExecuteNonQuery();}

@@ -28,7 +28,7 @@ public sealed partial class MainForm:Form{
     readonly CheckBox separateTeams=new(){Text="Развести одну команду (если возможно)",AutoSize=true};
 
     public MainForm(){
-        Text="Самбо-секретарь 2.0";WindowState=FormWindowState.Maximized;MinimumSize=new Size(1100,700);
+        Text="Самбо-секретарь 3.0";WindowState=FormWindowState.Maximized;MinimumSize=new Size(1100,700);
         db=new Database(Path.Combine(root,"sambo.db"));
         BuildTournamentTab();BuildCategoriesTab();BuildAthletesTab();BuildAdmissionTab();BuildWeighTab();BuildJudgesTab();BuildDrawTab();BuildBoutsTab();BuildMatsTab();BuildResultsTab();BuildDocumentsTab();BuildAuditTab();
         Controls.Add(tabs);LoadTournament();ReloadAll();ShowResumeNotice();

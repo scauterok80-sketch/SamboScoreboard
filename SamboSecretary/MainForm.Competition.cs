@@ -240,6 +240,7 @@ public sealed partial class MainForm{
         p.Controls.Add(Btn("Пустой протокол взвешивания",(s,e)=>PrintLines("ПРОТОКОЛ ВЗВЕШИВАНИЯ",WeighLines(false))));
         p.Controls.Add(Btn("Заполненный протокол взвешивания",(s,e)=>PrintLines("ПРОТОКОЛ ВЗВЕШИВАНИЯ — РЕЗУЛЬТАТ",WeighLines(true))));
         p.Controls.Add(Btn("Список судей",(s,e)=>PrintLines("СУДЕЙСКИЙ КОРПУС",JudgeLines())));
+        p.Controls.Add(Btn("Пустой пакет всех категорий",(s,e)=>PrintLines("ПУСТЫЕ ПРОТОКОЛЫ ВСЕХ КАТЕГОРИЙ",db.Categories().SelectMany(cat=>BlankCategoryLines(cat.Id)))));
         p.Controls.Add(Btn("Пустой протокол выбранной категории",(s,e)=>{var cid=SelectedCategory(boutCategory)??SelectedCategory(drawCategory);if(cid.HasValue)PrintLines("ПУСТОЙ ПРОТОКОЛ КАТЕГОРИИ",BlankCategoryLines(cid.Value));else MessageBox.Show("Сначала выберите категорию.");}));
         p.Controls.Add(Btn("Протокол выбранной категории",(s,e)=>{var cid=SelectedCategory(boutCategory)??SelectedCategory(drawCategory);if(cid.HasValue)PrintLines("ПРОТОКОЛ КАТЕГОРИИ",CategoryLines(cid.Value));else MessageBox.Show("Сначала выберите категорию на вкладке «Поединки» или «Жеребьёвка».");}));
         p.Controls.Add(Btn("Командный зачёт",(s,e)=>PrintLines("КОМАНДНЫЙ ЗАЧЁТ",TeamStandingLines())));
@@ -251,8 +252,8 @@ public sealed partial class MainForm{
 
     IEnumerable<string> HeaderLines(){var t=db.GetTournament();yield return t.Name;yield return $"Место: {t.Place}";yield return $"Даты: {t.StartDate} — {t.EndDate}";yield return $"Главный судья: {t.ChiefReferee}    Главный секретарь: {t.ChiefSecretary}";yield return "";}
     IEnumerable<string> ParticipantLines()=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | {a.Region} | {a.Team} | {a.Discipline} | {a.AgeGroup} | {a.WeightCategory} | {a.Status}"));
-    IEnumerable<string> CredentialLines()=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | {a.BirthDate} | {a.Region} | {a.Organization} | {a.Discipline} | {a.AgeGroup} | {a.WeightCategory} | статус допуска: {a.Status}"));
-    IEnumerable<string> WeighLines(bool filled)=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | категория {a.WeightCategory} | заявл. {a.DeclaredWeight?.ToString()??"___"} | факт. {(filled?a.ActualWeight?.ToString()??"___":"___")} | {(filled?a.Status:"________")}"));
+    IEnumerable<string> CredentialLines()=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | {a.BirthDate} | {a.Region} | {a.Organization} | {a.Discipline} | {a.AgeGroup} | {a.WeightCategory} | статус: {a.Status} | причина: {a.StatusReason}"));
+    IEnumerable<string> WeighLines(bool filled)=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | категория {a.WeightCategory} | заявл. {a.DeclaredWeight?.ToString()??"___"} | факт. {(filled?a.ActualWeight?.ToString()??"___":"___")} | {(filled?a.Status:"________")} | причина {(filled?a.StatusReason:"________")}"));
     IEnumerable<string> JudgeLines()=>HeaderLines().Concat(db.Judges().Select((j,i)=>$"{i+1}. {j.Name} | {j.Region} | {j.Category} | {j.Role}"));
     IEnumerable<string> CategoryLines(long cid){
         var c=db.Categories().First(x=>x.Id==cid);var lines=new List<string>();lines.AddRange(HeaderLines());lines.Add($"{c.Discipline}; {c.Gender}; {c.AgeGroup}; {c.WeightCategory}; система: {c.System}; утешительные: {c.Repechage}");lines.Add("");

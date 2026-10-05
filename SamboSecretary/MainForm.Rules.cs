@@ -189,6 +189,8 @@ public sealed partial class MainForm{
     IEnumerable<string> BlankCategoryLines(long cid){
         var cat=db.Categories().First(x=>x.Id==cid);var lines=new List<string>();lines.AddRange(HeaderLines());
         lines.Add($"{cat.Discipline}; {cat.Gender}; {cat.AgeGroup}; {cat.WeightCategory}; система: {cat.System}; утешительные: {cat.Repechage}");
+        var assignments=db.JudgeAssignments(cid);
+        if(assignments.Count>0){lines.Add("");lines.Add("СУДЕЙСКИЕ НАЗНАЧЕНИЯ:");lines.AddRange(assignments.Select(x=>$"Ковёр {x.Mat}: {x.Role} — {x.JudgeName}"));}
         lines.Add("");lines.Add("СОСТАВ КАТЕГОРИИ:");
         var athletes=db.Athletes(cid);for(int i=0;i<athletes.Count;i++)lines.Add($"{i+1}. {athletes[i].FullName} | {athletes[i].Team} | вес ______ | допуск ______");
         lines.Add("");lines.Add("ХОД СОРЕВНОВАНИЙ:");

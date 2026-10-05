@@ -66,17 +66,17 @@ public sealed class ImportMappingDialog:Form{
         Text="Импорт Excel — сопоставление колонок";Width=900;Height=720;StartPosition=FormStartPosition.CenterParent;
         var split=new SplitContainer{Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=370};
         var p=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,Padding=new Padding(10),AutoScroll=true};
-        var fields=new[]{
-            ("ФИО","фио","ф.и.о","спортсмен"),("Фамилия","фамил"),("Имя","имя"),("Отчество","отчеств"),
-            ("Дата рождения","рожд"),("Пол","пол"),("Регион","регион","город"),("Организация","организац","школ"),
-            ("Команда","команд"),("Тренер","тренер"),("Разряд","разряд","звание"),("Дисциплина","дисцип"),
-            ("Возрастная группа","возраст"),("Весовая категория","категор","весов"),("Заявленный вес","заявлен","вес")
+        var fields=new (string Label,string[] Keys)[]{
+            ("ФИО",new[]{"фио","ф.и.о","спортсмен"}),("Фамилия",new[]{"фамил"}),("Имя",new[]{"имя"}),("Отчество",new[]{"отчеств"}),
+            ("Дата рождения",new[]{"рожд"}),("Пол",new[]{"пол"}),("Регион",new[]{"регион","город"}),("Организация",new[]{"организац","школ"}),
+            ("Команда",new[]{"команд"}),("Тренер",new[]{"тренер"}),("Разряд",new[]{"разряд","звание"}),("Дисциплина",new[]{"дисцип"}),
+            ("Возрастная группа",new[]{"возраст"}),("Весовая категория",new[]{"категор","весов"}),("Заявленный вес",new[]{"заявлен","вес"})
         };
         int i=0;
         foreach(var f in fields){
             var cb=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Width=240};cb.Items.Add("");cb.Items.AddRange(headers);
-            var guess=ExcelImporter.GuessHeader(headers,f.Skip(1).ToArray());if(guess!="")cb.SelectedItem=guess;else cb.SelectedIndex=0;boxes[f.Item1]=cb;
-            int col=(i%2)*2,row=i/2;p.Controls.Add(new Label{Text=f.Item1,AutoSize=true,Margin=new Padding(3,8,6,3)},col,row);p.Controls.Add(cb,col+1,row);i++;
+            var guess=ExcelImporter.GuessHeader(headers,f.Keys);if(guess!="")cb.SelectedItem=guess;else cb.SelectedIndex=0;boxes[f.Label]=cb;
+            int col=(i%2)*2,row=i/2;p.Controls.Add(new Label{Text=f.Label,AutoSize=true,Margin=new Padding(3,8,6,3)},col,row);p.Controls.Add(cb,col+1,row);i++;
         }
         split.Panel1.Controls.Add(p);
         var grid=new DataGridView{Dock=DockStyle.Fill,ReadOnly=true,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.DisplayedCells,DataSource=rows.Take(20).Select(r=>new System.Dynamic.ExpandoObject()).ToList()};

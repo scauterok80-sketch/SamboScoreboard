@@ -221,7 +221,12 @@ public sealed partial class MainForm{
 
     void BuildJudgesTab(){
         var page=Page("Судьи");var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=88,Padding=new Padding(4),AutoScroll=true};
-        bar.Controls.Add(Btn("Добавить судью",(s,e)=>{using var d=new JudgeDialog();if(d.ShowDialog(this)==DialogResult.OK&&d.NameBox.Text.Trim()!=""){db.AddJudge(d.NameBox.Text,d.Region.Text,d.Category.Text,d.Role.Text);ReloadAll();}}));
+        bar.Controls.Add(Btn("Добавить судью",(s,e)=>{using var d=new JudgeDialog();if(d.ShowDialog(this)==DialogResult.OK&&d.NameBox.Text.Trim()!=""){db.AddJudge(d.NameBox.Text,d.Region.Text,d.Category.Text,d.Role.Text,d.Notes.Text);ReloadAll();}}));
+        bar.Controls.Add(Btn("Редактировать судью",(s,e)=>{
+            var id=SelectedId(judgeGrid);if(!id.HasValue)return;var j=db.Judges().FirstOrDefault(x=>x.Id==id.Value);if(j==null)return;
+            using var d=new JudgeDialog();d.NameBox.Text=j.Name;d.Region.Text=j.Region;d.Category.Text=j.Category;if(d.Role.Items.Contains(j.Role))d.Role.SelectedItem=j.Role;d.Notes.Text=j.Notes;
+            if(d.ShowDialog(this)==DialogResult.OK&&d.NameBox.Text.Trim()!=""){db.UpdateJudge(j.Id,d.NameBox.Text,d.Region.Text,d.Category.Text,d.Role.Text,d.Notes.Text);ReloadAll();}
+        }));
         bar.Controls.Add(Btn("Удалить судью",(s,e)=>{var id=SelectedId(judgeGrid);if(id.HasValue&&MessageBox.Show("Удалить выбранного судью и его назначения?","Удаление",MessageBoxButtons.YesNo)==DialogResult.Yes){db.DeleteJudge(id.Value);ReloadAll();}}));
         bar.Controls.Add(new Label{Text="Категория:",AutoSize=true,Margin=new Padding(12,13,3,0)});bar.Controls.Add(judgeAssignmentCategory);
         bar.Controls.Add(new Label{Text="Ковёр:",AutoSize=true,Margin=new Padding(10,13,3,0)});bar.Controls.Add(judgeAssignmentMat);
@@ -234,7 +239,7 @@ public sealed partial class MainForm{
         var split=new SplitContainer{Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=300};split.Panel1.Controls.Add(judgeGrid);split.Panel2.Controls.Add(judgeAssignmentGrid);
         page.Controls.Add(split);page.Controls.Add(bar);
     }
-    void ReloadJudges(){judgeGrid.DataSource=db.Judges().Select(x=>new{ID=x.Id,ФИО=x.Name,Регион=x.Region,Категория=x.Category,Роль=x.Role}).ToList();}
+    void ReloadJudges(){judgeGrid.DataSource=db.Judges().Select(x=>new{ID=x.Id,ФИО=x.Name,Регион=x.Region,Категория=x.Category,Роль=x.Role,Примечания=x.Notes}).ToList();}
     void ReloadJudgeAssignments(){
         var cid=SelectedCategory(judgeAssignmentCategory);var cats=db.Categories().ToDictionary(x=>x.Id,x=>$"{x.Discipline} {x.Gender} {x.AgeGroup} {x.WeightCategory}");
         judgeAssignmentGrid.DataSource=db.JudgeAssignments(cid).Select(x=>new{ID=x.Id,Категория=cats.TryGetValue(x.CategoryId,out var n)?n:x.CategoryId.ToString(),Ковёр=x.Mat,ФИО=x.JudgeName,Роль=x.Role}).ToList();

@@ -47,6 +47,10 @@ public sealed partial class MainForm:Form{
         var b=new Button{Text=text,AutoSize=true,Margin=new Padding(5)};b.Click+=click;return b;
     }
 
+    void UiGuard(Action action,string title="Операция не выполнена"){
+        try{action();}catch(Exception ex){MessageBox.Show(ex.Message,title,MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+    }
+
     TabPage Page(string title){var p=new TabPage(title);tabs.TabPages.Add(p);return p;}
 
     void ReloadAll(){

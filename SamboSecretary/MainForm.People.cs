@@ -175,6 +175,24 @@ public sealed partial class MainForm{
         athleteGrid.DataSource=db.Athletes().Select(x=>new{ID=x.Id,ФИО=x.FullName,Дата_рождения=x.BirthDate,Пол=x.Gender,Регион=x.Region,Организация=x.Organization,Команда=x.Team,Тренер=x.Coach,Разряд=x.Rank,Дисциплина=x.Discipline,Возраст=x.AgeGroup,Весовая_категория=x.WeightCategory,Заявленный_вес=x.DeclaredWeight,Фактический_вес=x.ActualWeight,Статус=x.Status,Категория_ID=x.CategoryId}).ToList();
     }
 
+    void BuildAdmissionTab(){
+        var page=Page("Допуск");
+        var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=54,Padding=new Padding(4),AutoScroll=true};
+        var status=new ComboBox{Width=190,DropDownStyle=ComboBoxStyle.DropDownList};
+        status.Items.AddRange(["Заявлен","Документы проверены","Допущен","Не допущен","Ожидает решения"]);status.SelectedIndex=1;
+        var reason=new TextBox{Width=360};
+        bar.Controls.Add(new Label{Text="Статус:",AutoSize=true,Margin=new Padding(6,13,4,0)});bar.Controls.Add(status);
+        bar.Controls.Add(new Label{Text="Причина / примечание:",AutoSize=true,Margin=new Padding(12,13,4,0)});bar.Controls.Add(reason);
+        bar.Controls.Add(Btn("Сохранить решение",(s,e)=>{
+            var id=SelectedId(admissionGrid);if(!id.HasValue){MessageBox.Show("Выберите спортсмена.");return;}
+            UiGuard(()=>{db.UpdateAthleteStatus(id.Value,status.Text,reason.Text.Trim());AutoBackup();ReloadAll();},"Решение о допуске не изменено");
+        }));
+        page.Controls.Add(admissionGrid);page.Controls.Add(bar);
+    }
+    void ReloadAdmission(){
+        admissionGrid.DataSource=db.Athletes().Select(x=>new{ID=x.Id,ФИО=x.FullName,Дата_рождения=x.BirthDate,Регион=x.Region,Организация=x.Organization,Дисциплина=x.Discipline,Возраст=x.AgeGroup,Категория=x.WeightCategory,Статус=x.Status,Причина=x.StatusReason}).ToList();
+    }
+
     void BuildWeighTab(){
         var page=Page("Взвешивание");
         var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=52,Padding=new Padding(4)};
@@ -194,7 +212,7 @@ public sealed partial class MainForm{
         bar.Controls.Add(Btn("Изменить только допуск",(s,e)=>{var id=SelectedId(weighGrid);if(id.HasValue)UiGuard(()=>{db.UpdateAthleteStatus(id.Value,status.Text);ReloadAll();},"Допуск не изменён");}));
         page.Controls.Add(weighGrid);page.Controls.Add(bar);
     }
-    void ReloadWeigh(){weighGrid.DataSource=db.Athletes().Select(x=>new{ID=x.Id,ФИО=x.FullName,Категория=x.WeightCategory,Заявленный=x.DeclaredWeight,Фактический=x.ActualWeight,Статус=x.Status,Команда=x.Team}).ToList();}
+    void ReloadWeigh(){weighGrid.DataSource=db.Athletes().Select(x=>new{ID=x.Id,ФИО=x.FullName,Категория=x.WeightCategory,Заявленный=x.DeclaredWeight,Фактический=x.ActualWeight,Статус=x.Status,Причина=x.StatusReason,Команда=x.Team}).ToList();}
 
     void BuildJudgesTab(){
         var page=Page("Судьи");var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=88,Padding=new Padding(4),AutoScroll=true};

@@ -170,12 +170,10 @@ public sealed partial class MainForm{
     }
 
     List<long> RankGroup(List<long> ids,List<BoutRow> bouts){
-        var stats=ids.ToDictionary(x=>x,x=>new{Id=x,Wins=0,Diff=0});
-        var wins=ids.ToDictionary(x=>x,x=>0);var diff=ids.ToDictionary(x=>x,x=>0);
-        foreach(var b in bouts.Where(x=>x.Status=="Завершён"&&x.RedId.HasValue&&x.BlueId.HasValue&&x.WinnerId.HasValue)){
-            wins[b.WinnerId!.Value]++;diff[b.RedId!.Value]+=(b.RedScore??0)-(b.BlueScore??0);diff[b.BlueId!.Value]+=(b.BlueScore??0)-(b.RedScore??0);
-        }
-        return ids.OrderByDescending(x=>wins[x]).ThenByDescending(x=>diff[x]).ToList();
+        if(bouts.Count==0)return ids;
+        var boutIds=bouts.Select(x=>x.Id).ToHashSet();
+        var rules=db.BoutRules(bouts[0].CategoryId).Where(x=>boutIds.Contains(x.Id)).ToList();
+        return ResolveRanking(bouts[0].CategoryId,ids,rules,bouts[0].Stage.StartsWith("Группа A")?"подгруппа A":"подгруппа B");
     }
 
     void AdvanceOlympic(long cid){

@@ -110,9 +110,14 @@ public sealed partial class MainForm{
     }
 
     long? FindCategory(string discipline,string gender,string age,string weight){
-        var c=db.Categories().FirstOrDefault(x=>Eq(x.Discipline,discipline)&&Eq(x.Gender,gender)&&Eq(x.AgeGroup,age)&&Eq(x.WeightCategory,weight));return c?.Id;
+        var c=db.Categories().FirstOrDefault(x=>Eq(x.Discipline,discipline)&&GenderEq(x.Gender,gender)&&Eq(x.AgeGroup,age)&&Eq(x.WeightCategory,weight));return c?.Id;
     }
     static bool Eq(string a,string b)=>string.Equals(a?.Trim(),b?.Trim(),StringComparison.OrdinalIgnoreCase);
+    static bool GenderEq(string a,string b){
+        if(Eq(a,b))return true;
+        string Code(string s){s=(s??"").ToLowerInvariant();if(s.Contains("жен")||s.Contains("дев"))return "F";if(s.Contains("муж")||s.Contains("юн"))return "M";return "";}
+        var x=Code(a);return x!=""&&x==Code(b);
+    }
     static double? ParseDouble(string? s){if(string.IsNullOrWhiteSpace(s))return null;return double.TryParse(s.Replace(',','.'),System.Globalization.NumberStyles.Any,System.Globalization.CultureInfo.InvariantCulture,out var v)?v:null;}
 
     void ImportExcelClick(object? s,EventArgs e){

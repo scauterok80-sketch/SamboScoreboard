@@ -1,7 +1,7 @@
 namespace SamboSecretary;
 
 public record ClassificationResult(string Code,int Red,int Blue,bool Clean);
-public record RankMetric(long AthleteId,int ClassPoints,int Wins,int MutualWins,int MutualClass,int CleanWins,int CleanWinSeconds,int NonCleanFourZero,int Win30,int Win31,int Win20,int LossClass,int CleanLosses,int CleanLossSeconds,int TechPoints,int TechDiff);
+public record RankMetric(long AthleteId,int ClassPoints,int Wins,int MutualWins,int MutualClass,int CleanWins,int CleanWinSeconds,int NonCleanFourZero,int Win30,int Win31,int Win20,int LossClass,int CleanLosses,int CleanLossSeconds,int Tech4,int Tech2,int Tech1,int TechPoints,int TechDiff);
 public record RankingResult(List<long> Ordered,List<List<long>> Unresolved,Dictionary<long,RankMetric> Metrics);
 
 public static class CompetitionRules{
@@ -45,6 +45,9 @@ public static class CompetitionRules{
                 .ThenByDescending(id=>groupMetrics[id].LossClass)
                 .ThenBy(id=>groupMetrics[id].CleanLosses)
                 .ThenByDescending(id=>groupMetrics[id].CleanLossSeconds)
+                .ThenByDescending(id=>groupMetrics[id].Tech4)
+                .ThenByDescending(id=>groupMetrics[id].Tech2)
+                .ThenByDescending(id=>groupMetrics[id].Tech1)
                 .ThenByDescending(id=>groupMetrics[id].TechPoints)
                 .ThenByDescending(id=>groupMetrics[id].TechDiff)
                 .ThenByDescending(id=>metrics[id].Wins)
@@ -75,14 +78,15 @@ public static class CompetitionRules{
 
     static string TieKey(long id,Dictionary<long,RankMetric> group,Dictionary<long,RankMetric> all){
         var g=group[id];var a=all[id];
-        return string.Join("|",g.MutualWins,g.MutualClass,g.CleanWins,g.CleanWinSeconds,g.NonCleanFourZero,g.Win30,g.Win31,g.Win20,g.LossClass,g.CleanLosses,g.CleanLossSeconds,g.TechPoints,g.TechDiff,a.Wins,a.CleanWins,a.CleanWinSeconds,a.Win30,a.Win31,a.Win20);
+        return string.Join("|",g.MutualWins,g.MutualClass,g.CleanWins,g.CleanWinSeconds,g.NonCleanFourZero,g.Win30,g.Win31,g.Win20,g.LossClass,g.CleanLosses,g.CleanLossSeconds,g.Tech4,g.Tech2,g.Tech1,g.TechPoints,g.TechDiff,a.Wins,a.CleanWins,a.CleanWinSeconds,a.Win30,a.Win31,a.Win20,a.Tech4,a.Tech2,a.Tech1);
     }
 
     static RankMetric BuildMetric(long id,IReadOnlyCollection<long> comparisonSet,List<BoutRuleRow> bouts){
-        int classPoints=0,wins=0,mutualWins=0,mutualClass=0,cleanWins=0,cleanWinSeconds=0,nonClean40=0,win30=0,win31=0,win20=0,lossClass=0,cleanLosses=0,cleanLossSeconds=0,tech=0,diff=0;
+        int classPoints=0,wins=0,mutualWins=0,mutualClass=0,cleanWins=0,cleanWinSeconds=0,nonClean40=0,win30=0,win31=0,win20=0,lossClass=0,cleanLosses=0,cleanLossSeconds=0,tech4=0,tech2=0,tech1=0,tech=0,diff=0;
         foreach(var b in bouts.Where(b=>b.RedId==id||b.BlueId==id)){
             bool red=b.RedId==id;long opponent=red?b.BlueId!.Value:b.RedId!.Value;int ownClass=red?b.RedClass:b.BlueClass,oppClass=red?b.BlueClass:b.RedClass;int ownScore=red?b.RedScore:b.BlueScore,oppScore=red?b.BlueScore:b.RedScore;bool won=b.WinnerId==id;
-            classPoints+=ownClass;tech+=ownScore;diff+=ownScore-oppScore;if(won)wins++;
+            classPoints+=ownClass;tech+=ownScore;diff+=ownScore-oppScore;
+            tech4+=red?b.Red4:b.Blue4;tech2+=red?b.Red2:b.Blue2;tech1+=red?b.Red1:b.Blue1;if(won)wins++;
             bool mutual=comparisonSet.Contains(opponent);
             if(mutual){mutualClass+=ownClass;if(won)mutualWins++;}
             string code=b.ResultCode;
@@ -95,7 +99,7 @@ public static class CompetitionRules{
                 if(code=="4:0"&&b.IsClean){cleanLosses++;cleanLossSeconds+=b.DurationSeconds;}
             }
         }
-        return new(id,classPoints,wins,mutualWins,mutualClass,cleanWins,cleanWinSeconds,nonClean40,win30,win31,win20,lossClass,cleanLosses,cleanLossSeconds,tech,diff);
+        return new(id,classPoints,wins,mutualWins,mutualClass,cleanWins,cleanWinSeconds,nonClean40,win30,win31,win20,lossClass,cleanLosses,cleanLossSeconds,tech4,tech2,tech1,tech,diff);
     }
 
     public static int StageOrder(string stage){

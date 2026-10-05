@@ -32,8 +32,15 @@ public sealed partial class MainForm{
         var cid=SelectedCategory(drawCategory);if(!cid.HasValue){MessageBox.Show("Выберите категорию.");return;}
         var cat=db.Categories().First(x=>x.Id==cid.Value);
         if(cat.DrawApproved){MessageBox.Show("Жеребьёвка уже утверждена. Сначала разблокируйте её.");return;}
-        var athletes=db.Athletes(cid.Value).Where(a=>a.Status=="Допущен"&&a.ActualWeight.HasValue).ToList();
-        if(athletes.Count<2){MessageBox.Show("Для жеребьёвки требуется минимум два взвешенных и допущенных спортсмена.");return;}
+        var categoryAthletes=db.Athletes(cid.Value);
+        var eligibility=EligibilityRules.ValidateForDraw(cat,categoryAthletes);
+        if(eligibility.Count>0){
+            MessageBox.Show("Жеребьёвка заблокирована. Исправьте следующие данные:\n\n"+string.Join("\n",eligibility.Take(20))+(eligibility.Count>20?"\n...":""),"Контроль перед жеребьёвкой",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+            db.Audit($"Жеребьёвка категории {cid.Value} заблокирована: {eligibility.Count} ошибок допуска/данных");
+            return;
+        }
+        var athletes=categoryAthletes.ToList();
+        if(athletes.Count<2){MessageBox.Show("Для жеребьёвки требуется минимум два участника.");return;}
         string system=drawSystem.Text=="Авто"?AutoSystem(athletes.Count):drawSystem.Text;
         var allowed=TournamentEngine.Allowed(athletes.Count);
         var enumSystem=system switch{"Круговая"=>TournamentSystem.RoundRobin,"Смешанная"=>TournamentSystem.Mixed,"Олимпийская"=>TournamentSystem.Olympic,_=>TournamentSystem.RoundRobin};
@@ -115,7 +122,7 @@ public sealed partial class MainForm{
         var rules=db.BoutRules(id.Value).ToDictionary(x=>x.Id);
         boutGrid.DataSource=db.Bouts(id.Value).Select(x=>{
             var r=rules[x.Id];
-            return new{ID=x.Id,Номер=x.BoutNo,Этап=x.Stage,Красный=x.RedName,Синий=x.BlueName,Ковер=x.Mat,Статус=x.Status,Счет_красного=x.RedScore,Счет_синего=x.BlueScore,Классификация=r.ResultCode,Время=$"{r.DurationSeconds/60}:{r.DurationSeconds%60:00}",Победитель=x.WinnerName,Причина=x.Reason,Судьи=x.Judges};
+            return new{ID=x.Id,Номер=x.DisplayNo,Порядок_сетки=x.BoutNo,План=x.ScheduledTime,Этап=x.Stage,Красный=x.RedName,Синий=x.BlueName,Ковер=x.Mat,Статус=x.Status,Счет_красного=x.RedScore,Счет_синего=x.BlueScore,Классификация=r.ResultCode,Время=$"{r.DurationSeconds/60}:{r.DurationSeconds%60:00}",Победитель=x.WinnerName,Причина=x.Reason,Судьи=x.Judges};
         }).ToList();
     }
     void ChangeBoutStateClick(object? s,EventArgs e){
@@ -123,9 +130,14 @@ public sealed partial class MainForm{
         var b=db.Bouts(cid.Value).FirstOrDefault(x=>x.Id==bid.Value);if(b==null)return;
         var status=Microsoft.VisualBasic.Interaction.InputBox("Статус: Ожидает / Готов / Вызван / Идёт / Завершён","Статус поединка",b.Status);
         if(string.IsNullOrWhiteSpace(status))return;
+        var allowed=new[]{"Ожидает","Готов","Вызван","Идёт","Завершён"};
+        if(!allowed.Contains(status.Trim(),StringComparer.OrdinalIgnoreCase)){MessageBox.Show("Разрешённые статусы: Ожидает, Готов, Вызван, Идёт, Завершён.");return;}
         var matText=Microsoft.VisualBasic.Interaction.InputBox($"Номер ковра (1–{tMats.Value})","Ковёр",b.Mat.ToString());
         if(!int.TryParse(matText,out var mat)||mat<1||mat>(int)tMats.Value){MessageBox.Show("Некорректный номер ковра.");return;}
-        db.SetBoutStatus(b.Id,status.Trim(),mat);ReloadAll();
+        var displayText=Microsoft.VisualBasic.Interaction.InputBox("Видимый номер поединка (не меняет положение в сетке):","Номер поединка",b.DisplayNo.ToString());
+        if(!int.TryParse(displayText,out var displayNo)||displayNo<1){MessageBox.Show("Некорректный видимый номер.");return;}
+        var scheduled=Microsoft.VisualBasic.Interaction.InputBox("Плановое время, например 14:35 (можно оставить пустым):","Расписание",b.ScheduledTime);
+        db.SetBoutStatus(b.Id,status.Trim(),mat,scheduled.Trim(),displayNo);AutoBackup();ReloadAll();
     }
 
     void EnterResultClick(object? s,EventArgs e){
@@ -237,7 +249,7 @@ public sealed partial class MainForm{
         var rules=db.BoutRules(cid).ToDictionary(x=>x.Id);
         foreach(var b in db.Bouts(cid)){
             var r=rules[b.Id];string result=b.Status=="Завершён"?$"{b.RedScore}:{b.BlueScore}; классификация {r.ResultCode} ({r.RedClass}:{r.BlueClass}); время {r.DurationSeconds/60}:{r.DurationSeconds%60:00}; победитель {b.WinnerName}; {b.Reason}":"не проведён";
-            lines.Add($"№{b.BoutNo} {b.Stage}: {b.RedName} — {b.BlueName}; {result}; ковёр {b.Mat}; судьи: {b.Judges}");
+            lines.Add($"№{b.DisplayNo} {b.Stage}: {b.RedName} — {b.BlueName}; {result}; ковёр {b.Mat}; план {b.ScheduledTime}; судьи: {b.Judges}");
         }
         var places=db.Placements(cid);if(places.Count>0){lines.Add("");lines.Add("ИТОГОВЫЕ МЕСТА:");lines.AddRange(places.Select(p=>$"{p.Place} место — {p.Athlete} | {p.Team} | {p.Source}"));}
         return lines;

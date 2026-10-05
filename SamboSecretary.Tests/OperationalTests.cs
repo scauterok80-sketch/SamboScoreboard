@@ -96,4 +96,27 @@ public class OperationalTests{
         var x=Assert.Single(db.Bouts(cid));
         Assert.Equal(7,x.BoutNo);Assert.Equal(101,x.DisplayNo);Assert.Equal("14:35",x.ScheduledTime);Assert.Equal(2,x.Mat);
     }
+
+    [Fact]
+    public void DatabaseHandlesRealistic250ParticipantEvent(){
+        var db=new Database(TempDb());int total=0;
+        for(int ci=0;ci<10;ci++){
+            string weight=(50+ci*5)+" кг";
+            var cid=db.AddCategory("Спортивное самбо",ci%2==0?"Мужчины":"Женщины","18+",weight,"Олимпийская","От финалистов","Полностью автоматическая");
+            for(int i=0;i<25;i++){
+                string sex=ci%2==0?"Мужской":"Женский";
+                var id=db.AddAthlete($"спортсмен{ci}_{i} имя отчество",birth:$"200{i%10}-01-01",gender:sex,region:"Регион "+(i%8),team:"Команда "+(i%12),discipline:"Спортивное самбо",age:"18+",weight:weight,categoryId:cid);
+                db.SetWeigh(id,49+ci*5,"Допущен");total++;
+            }
+        }
+        Assert.Equal(250,total);Assert.Equal(250,db.Athletes().Count);Assert.Equal(10,db.Categories().Count);
+    }
+
+    [Fact]
+    public void AdmissionReasonPersists(){
+        var db=new Database(TempDb());var id=db.AddAthlete("петров петр петрович");
+        db.UpdateAthleteStatus(id,"Не допущен","нет медицинского допуска");
+        var a=Assert.Single(db.Athletes());
+        Assert.Equal("Не допущен",a.Status);Assert.Equal("нет медицинского допуска",a.StatusReason);
+    }
 }

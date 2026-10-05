@@ -11,7 +11,7 @@ public sealed partial class MainForm{
         AddField(p,"Название соревнования",tName);AddField(p,"Место проведения",tPlace);AddField(p,"Дата начала",tStart);AddField(p,"Дата окончания",tEnd);AddField(p,"Количество ковров",tMats);AddField(p,"Главный судья",tChiefRef);AddField(p,"Главный секретарь",tChiefSec);AddField(p,"Командные очки 1/2/3/5-е места",tTeamScheme);
         var save=Btn("Сохранить данные турнира",(s,e)=>{db.SaveTournament(tName.Text,tPlace.Text,tStart.Text,tEnd.Text,(int)tMats.Value,tChiefRef.Text,tChiefSec.Text,tTeamScheme.Text);AutoBackup();MessageBox.Show("Данные турнира сохранены.");ReloadAll();});
         var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true};
-        buttons.Controls.Add(save);buttons.Controls.Add(Btn("Новый турнир",NewTournamentClick));
+        buttons.Controls.Add(save);buttons.Controls.Add(Btn("Новый турнир",NewTournamentClick));buttons.Controls.Add(Btn("Открыть архив",OpenTournamentArchiveClick));
         p.Controls.Add(buttons,1,p.RowCount);int rr=p.RowCount++;p.Controls.Add(tournamentStats,0,rr);p.SetColumnSpan(tournamentStats,2);page.Controls.Add(p);
     }
     void ReloadDashboard(){
@@ -31,6 +31,19 @@ public sealed partial class MainForm{
         }catch(Exception ex){MessageBox.Show(ex.Message,"Ошибка создания нового турнира");}
     }
 
+    void OpenTournamentArchiveClick(object? s,EventArgs e){
+        using var o=new OpenFileDialog{Filter="База турнира (*.db)|*.db",InitialDirectory=Path.Combine(root,"TournamentArchive"),Title="Открыть архив турнира"};
+        if(o.ShowDialog(this)!=DialogResult.OK)return;
+        var ans=MessageBox.Show("Текущий турнир будет автоматически сохранён в архив и заменён выбранной базой. Продолжить?","Открыть архив",MessageBoxButtons.YesNo,MessageBoxIcon.Warning);
+        if(ans!=DialogResult.Yes)return;
+        try{
+            var t=db.GetTournament();var dir=Path.Combine(root,"TournamentArchive");Directory.CreateDirectory(dir);
+            string raw=string.IsNullOrWhiteSpace(t.Name)?"Tournament":t.Name;var invalid=Path.GetInvalidFileNameChars();var safe=new string(raw.Select(ch=>invalid.Contains(ch)?'_':ch).ToArray());
+            File.Copy(db.FileName,Path.Combine(dir,$"{safe}_{DateTime.Now:yyyyMMdd_HHmmss}_before_restore.db"),true);
+            File.Copy(o.FileName,db.FileName,true);LoadTournament();ReloadAll();MessageBox.Show("Архивный турнир открыт.");
+        }catch(Exception ex){MessageBox.Show(ex.Message,"Ошибка открытия архива");}
+    }
+
     static void AddField(TableLayoutPanel p,string label,Control c){int r=p.RowCount++;p.RowStyles.Add(new RowStyle(SizeType.AutoSize));p.Controls.Add(new Label{Text=label,AutoSize=true,Margin=new Padding(3,10,15,3)},0,r);c.Dock=DockStyle.Fill;c.Width=500;p.Controls.Add(c,1,r);}
     void LoadTournament(){var t=db.GetTournament();tName.Text=t.Name;tPlace.Text=t.Place;tStart.Text=t.StartDate;tEnd.Text=t.EndDate;tMats.Value=Math.Clamp(t.Mats,1,12);tChiefRef.Text=t.ChiefReferee;tChiefSec.Text=t.ChiefSecretary;tTeamScheme.Text=t.TeamScheme;}
 
@@ -38,6 +51,7 @@ public sealed partial class MainForm{
         var page=Page("Категории");
         var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=48,Padding=new Padding(4)};
         bar.Controls.Add(Btn("Добавить категорию",AddCategoryClick));
+        bar.Controls.Add(Btn("Редактировать выбранную",EditCategoryClick));
         bar.Controls.Add(Btn("Удалить выбранную",(s,e)=>{var id=SelectedId(categoryGrid);if(!id.HasValue)return;if(MessageBox.Show("Удалить выбранную категорию?","Подтверждение",MessageBoxButtons.YesNo)==DialogResult.Yes){db.DeleteCategory(id.Value);ReloadAll();}}));
         page.Controls.Add(categoryGrid);page.Controls.Add(bar);
     }
@@ -46,6 +60,15 @@ public sealed partial class MainForm{
         if(string.IsNullOrWhiteSpace(d.Weight.Text)){MessageBox.Show("Укажите весовую категорию.");return;}
         db.AddCategory(d.Discipline.Text,d.Gender.Text,d.Age.Text.Trim(),d.Weight.Text.Trim(),d.SystemBox.Text,d.Repechage.Text,d.DrawModeBox.Text);ReloadAll();
     }
+    void EditCategoryClick(object? s,EventArgs e){
+        var id=SelectedId(categoryGrid);if(!id.HasValue)return;var x=db.Categories().FirstOrDefault(c=>c.Id==id.Value);if(x==null)return;
+        if(x.DrawApproved){MessageBox.Show("Сначала разблокируйте утверждённую жеребьёвку категории.");return;}
+        using var d=new CategoryDialog();d.Discipline.SelectedItem=x.Discipline;d.Gender.SelectedItem=x.Gender;d.Age.Text=x.AgeGroup;d.Weight.Text=x.WeightCategory;
+        if(d.SystemBox.Items.Contains(x.System))d.SystemBox.SelectedItem=x.System;if(d.Repechage.Items.Contains(x.Repechage))d.Repechage.SelectedItem=x.Repechage;if(d.DrawModeBox.Items.Contains(x.DrawMode))d.DrawModeBox.SelectedItem=x.DrawMode;
+        if(d.ShowDialog(this)!=DialogResult.OK)return;
+        db.UpdateCategory(id.Value,d.Discipline.Text,d.Gender.Text,d.Age.Text.Trim(),d.Weight.Text.Trim(),d.SystemBox.Text,d.Repechage.Text,d.DrawModeBox.Text);AutoBackup();ReloadAll();
+    }
+
     void ReloadCategories(){
         categoryGrid.DataSource=db.Categories().Select(x=>new{ID=x.Id,Дисциплина=x.Discipline,Пол=x.Gender,Возраст=x.AgeGroup,Весовая_категория=x.WeightCategory,Система=x.System,Утешительные=x.Repechage,Жеребьёвка=x.DrawMode,Утверждена=x.DrawApproved,Статус=x.Status}).ToList();
     }
@@ -54,6 +77,8 @@ public sealed partial class MainForm{
         var page=Page("Участники");
         var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=50,Padding=new Padding(4),AutoScroll=true};
         bar.Controls.Add(Btn("Добавить спортсмена",AddAthleteClick));
+        bar.Controls.Add(Btn("Редактировать",EditAthleteClick));
+        bar.Controls.Add(Btn("Удалить",DeleteAthleteClick));
         bar.Controls.Add(Btn("Импорт Excel",ImportExcelClick));
         bar.Controls.Add(Btn("Создать Excel-шаблон",(s,e)=>{using var save=new SaveFileDialog{Filter="Excel (*.xlsx)|*.xlsx",FileName="Заявка_Самбо.xlsx"};if(save.ShowDialog(this)==DialogResult.OK){ExcelImporter.CreateTemplate(save.FileName);MessageBox.Show("Шаблон сохранён.");}}));
         bar.Controls.Add(new Label{Text="Назначить категорию:",AutoSize=true,Margin=new Padding(15,12,4,0)});
@@ -68,6 +93,22 @@ public sealed partial class MainForm{
         long? cid=FindCategory(d.Discipline.Text,d.Gender.Text,d.Age.Text,d.Weight.Text);
         db.AddAthlete(d.FullName.Text,d.Birth.Text,d.Gender.Text,d.Region.Text,d.Organization.Text,d.Team.Text,d.Coach.Text,d.Rank.Text,d.Discipline.Text,d.Age.Text,d.Weight.Text,dw,cid);ReloadAll();
     }
+    void EditAthleteClick(object? s,EventArgs e){
+        var id=SelectedId(athleteGrid);if(!id.HasValue)return;var a=db.Athletes().FirstOrDefault(x=>x.Id==id.Value);if(a==null)return;
+        using var d=new AthleteDialog();d.FullName.Text=a.FullName;d.Birth.Text=a.BirthDate;if(d.Gender.Items.Contains(a.Gender))d.Gender.SelectedItem=a.Gender;
+        d.Region.Text=a.Region;d.Organization.Text=a.Organization;d.Team.Text=a.Team;d.Coach.Text=a.Coach;d.Rank.Text=a.Rank;if(d.Discipline.Items.Contains(a.Discipline))d.Discipline.SelectedItem=a.Discipline;
+        d.Age.Text=a.AgeGroup;d.Weight.Text=a.WeightCategory;d.DeclaredWeight.Text=a.DeclaredWeight?.ToString(System.Globalization.CultureInfo.InvariantCulture)??"";
+        if(d.ShowDialog(this)!=DialogResult.OK||string.IsNullOrWhiteSpace(d.FullName.Text))return;
+        long? cid=FindCategory(d.Discipline.Text,d.Gender.Text,d.Age.Text,d.Weight.Text)??a.CategoryId;
+        db.UpdateAthlete(a.Id,d.FullName.Text,d.Birth.Text,d.Gender.Text,d.Region.Text,d.Organization.Text,d.Team.Text,d.Coach.Text,d.Rank.Text,d.Discipline.Text,d.Age.Text,d.Weight.Text,ParseDouble(d.DeclaredWeight.Text),cid);AutoBackup();ReloadAll();
+    }
+    void DeleteAthleteClick(object? s,EventArgs e){
+        var id=SelectedId(athleteGrid);if(!id.HasValue)return;
+        if(MessageBox.Show("Удалить выбранного спортсмена? Если он уже присутствует в поединках, удаление будет запрещено.","Удаление",MessageBoxButtons.YesNo)!=DialogResult.Yes)return;
+        if(!db.DeleteAthleteIfUnused(id.Value))MessageBox.Show("Спортсмен уже участвует в сформированных/проведённых поединках. Удаление запрещено; измените его статус вместо удаления.");
+        ReloadAll();
+    }
+
     long? FindCategory(string discipline,string gender,string age,string weight){
         var c=db.Categories().FirstOrDefault(x=>Eq(x.Discipline,discipline)&&Eq(x.Gender,gender)&&Eq(x.AgeGroup,age)&&Eq(x.WeightCategory,weight));return c?.Id;
     }
@@ -140,6 +181,7 @@ public sealed partial class MainForm{
     void BuildJudgesTab(){
         var page=Page("Судьи");var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=88,Padding=new Padding(4),AutoScroll=true};
         bar.Controls.Add(Btn("Добавить судью",(s,e)=>{using var d=new JudgeDialog();if(d.ShowDialog(this)==DialogResult.OK&&d.NameBox.Text.Trim()!=""){db.AddJudge(d.NameBox.Text,d.Region.Text,d.Category.Text,d.Role.Text);ReloadAll();}}));
+        bar.Controls.Add(Btn("Удалить судью",(s,e)=>{var id=SelectedId(judgeGrid);if(id.HasValue&&MessageBox.Show("Удалить выбранного судью и его назначения?","Удаление",MessageBoxButtons.YesNo)==DialogResult.Yes){db.DeleteJudge(id.Value);ReloadAll();}}));
         bar.Controls.Add(new Label{Text="Категория:",AutoSize=true,Margin=new Padding(12,13,3,0)});bar.Controls.Add(judgeAssignmentCategory);
         bar.Controls.Add(new Label{Text="Ковёр:",AutoSize=true,Margin=new Padding(10,13,3,0)});bar.Controls.Add(judgeAssignmentMat);
         bar.Controls.Add(Btn("Назначить выбранного судью",(s,e)=>{

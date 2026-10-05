@@ -16,18 +16,24 @@ jobs:
         run: dotnet test SamboSecretary.Tests/SamboSecretary.Tests.csproj -c Release --no-restore
       - name: Publish
         run: dotnet publish SamboSecretary/SamboSecretary.csproj -c Release -r win-x64 --self-contained true -o publish
+      - name: Package portable version
+        shell: powershell
+        run: Compress-Archive -Path publish\* -DestinationPath SamboSecretary_Portable_Windows_x64.zip
+      - name: Upload portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: SamboSecretary-Portable-Windows-x64
+          path: SamboSecretary_Portable_Windows_x64.zip
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
       - name: Build installer
         shell: powershell
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\SamboSecretary.iss'
-      - name: Package
+      - name: Package installer
         shell: powershell
         run: Compress-Archive -Path installer\output\SamboSecretary_Setup_1.0.0_win64.exe,README_RU.txt -DestinationPath SamboSecretary_1.0.0_Windows_x64.zip
-      - uses: actions/upload-artifact@v4
+      - name: Upload installer package
+        uses: actions/upload-artifact@v4
         with:
-          name: SamboSecretary-Windows-x64
-          path: |
-            SamboSecretary_1.0.0_Windows_x64.zip
-            installer/output/SamboSecretary_Setup_1.0.0_win64.exe
-            README_RU.txt
+          name: SamboSecretary-Installer-Windows-x64
+          path: SamboSecretary_1.0.0_Windows_x64.zip

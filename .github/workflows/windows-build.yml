@@ -33,9 +33,9 @@ jobs:
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\SamboSecretary.iss'
       - name: Package installer
         shell: powershell
-        run: Compress-Archive -Path installer\output\SamboSecretary_Setup_1.0.0_win64.exe,README_RU.txt -DestinationPath SamboSecretary_1.0.0_Windows_x64.zip
+        run: Compress-Archive -Path installer\output\SamboSecretary_Setup_2.0.0_win64.exe,README_RU.txt -DestinationPath SamboSecretary_2.0.0_Windows_x64.zip
       - name: Upload installer package
         uses: actions/upload-artifact@v4
         with:
           name: SamboSecretary-Installer-Windows-x64
-          path: SamboSecretary_1.0.0_Windows_x64.zip
+          path: SamboSecretary_2.0.0_Windows_x64.zip

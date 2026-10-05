@@ -177,7 +177,22 @@ public sealed partial class MainForm{
     }
 
     void ReloadAthletes(){
-        athleteGrid.DataSource=db.Athletes().Select(x=>new{ID=x.Id,ФИО=x.FullName,Дата_рождения=x.BirthDate,Пол=x.Gender,Регион=x.Region,Организация=x.Organization,Команда=x.Team,Тренер=x.Coach,Разряд=x.Rank,Дисциплина=x.Discipline,Возраст=x.AgeGroup,Весовая_категория=x.WeightCategory,Заявленный_вес=x.DeclaredWeight,Фактический_вес=x.ActualWeight,Статус=x.Status,Категория_ID=x.CategoryId}).ToList();
+        var categories=db.Categories();
+        var drawn=categories.SelectMany(cat=>db.DrawPositions(cat.Id)).Where(x=>x.AthleteId.HasValue).Select(x=>x.AthleteId!.Value).ToHashSet();
+        var bouts=categories.SelectMany(cat=>db.Bouts(cat.Id)).ToList();
+        var competing=bouts.Where(b=>b.RedId.HasValue||b.BlueId.HasValue).SelectMany(b=>new long?[]{b.RedId,b.BlueId}).Where(x=>x.HasValue).Select(x=>x!.Value).ToHashSet();
+        var finished=categories.SelectMany(cat=>db.Placements(cat.Id)).Select(x=>x.AthleteId).ToHashSet();
+        string Stage(Athlete a){
+            if(a.Status is "Не допущен" or "Дисквалифицирован" or "Снят врачом" or "Снят после травмирующего исхода")return a.Status;
+            if(finished.Contains(a.Id))return "Завершил";
+            if(competing.Contains(a.Id)&&bouts.Any(b=>(b.RedId==a.Id||b.BlueId==a.Id)&&b.Status!="Ожидает"))return "Выступает";
+            if(drawn.Contains(a.Id))return "Жеребьёвка";
+            if(a.ActualWeight.HasValue)return "Взвешен";
+            if(a.Status=="Допущен")return "Допущен";
+            if(a.Status=="Документы проверены")return "Документы проверены";
+            return "Заявлен";
+        }
+        athleteGrid.DataSource=db.Athletes().Select(x=>new{ID=x.Id,ФИО=x.FullName,Этап=Stage(x),Дата_рождения=x.BirthDate,Пол=x.Gender,Регион=x.Region,Организация=x.Organization,Команда=x.Team,Тренер=x.Coach,Разряд=x.Rank,Дисциплина=x.Discipline,Возраст=x.AgeGroup,Весовая_категория=x.WeightCategory,Заявленный_вес=x.DeclaredWeight,Фактический_вес=x.ActualWeight,Статус_допуска=x.Status,Категория_ID=x.CategoryId}).ToList();
     }
 
     void BuildAdmissionTab(){

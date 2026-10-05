@@ -102,7 +102,11 @@ public sealed partial class MainForm{
     }
     void ReloadBouts(){
         var id=SelectedCategory(boutCategory);if(!id.HasValue){boutGrid.DataSource=null;return;}
-        boutGrid.DataSource=db.Bouts(id.Value).Select(x=>new{ID=x.Id,Номер=x.BoutNo,Этап=x.Stage,Красный=x.RedName,Синий=x.BlueName,Ковер=x.Mat,Статус=x.Status,Счет_красного=x.RedScore,Счет_синего=x.BlueScore,Победитель=x.WinnerName,Причина=x.Reason,Судьи=x.Judges}).ToList();
+        var rules=db.BoutRules(id.Value).ToDictionary(x=>x.Id);
+        boutGrid.DataSource=db.Bouts(id.Value).Select(x=>{
+            var r=rules[x.Id];
+            return new{ID=x.Id,Номер=x.BoutNo,Этап=x.Stage,Красный=x.RedName,Синий=x.BlueName,Ковер=x.Mat,Статус=x.Status,Счет_красного=x.RedScore,Счет_синего=x.BlueScore,Классификация=r.ResultCode,Время=$"{r.DurationSeconds/60}:{r.DurationSeconds%60:00}",Победитель=x.WinnerName,Причина=x.Reason,Судьи=x.Judges};
+        }).ToList();
     }
     void ChangeBoutStateClick(object? s,EventArgs e){
         var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue)return;

@@ -166,10 +166,10 @@ public sealed partial class MainForm{
         bar.Controls.Add(Btn("Сохранить взвешивание",(s,e)=>{
             var id=SelectedId(weighGrid);var v=ParseDouble(kg.Text);if(!id.HasValue||!v.HasValue){MessageBox.Show("Выберите спортсмена и укажите вес.");return;}
             var a=db.Athletes().First(x=>x.Id==id.Value);string decision=status.Text;
-            if(WeightRules.IsOverweight(a.WeightCategory,v.Value,out var max)){
-                var ans=MessageBox.Show($"Фактический вес {v.Value:0.##} кг превышает верхнюю границу заявленной категории {a.WeightCategory} ({max:0.##} кг).\n\nДа — сохранить выбранное решение «{status.Text}» как решение комиссии.\nНет — сохранить вес со статусом «Ожидает решения».","Несоответствие весовой категории",MessageBoxButtons.YesNo,MessageBoxIcon.Warning);
+            if(WeightRules.IsMismatch(a.WeightCategory,v.Value,out var why)){
+                var ans=MessageBox.Show($"{why}. Заявленная категория: {a.WeightCategory}.\n\nДа — сохранить выбранное решение «{status.Text}» как решение комиссии.\nНет — сохранить вес со статусом «Ожидает решения».","Несоответствие весовой категории",MessageBoxButtons.YesNo,MessageBoxIcon.Warning);
                 if(ans==DialogResult.No)decision="Ожидает решения";
-                db.Audit($"Предупреждение о перевесе: {a.FullName}, категория {a.WeightCategory}, фактический вес {v.Value:0.##}; решение: {decision}");
+                db.Audit($"Предупреждение по весу: {a.FullName}, категория {a.WeightCategory}, фактический вес {v.Value:0.##}; решение: {decision}");
             }
             db.SetWeigh(id.Value,v.Value,decision);AutoBackup();ReloadAll();
         }));

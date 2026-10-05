@@ -276,13 +276,17 @@ public sealed class Database {
     }
     public void SetBoutResult(long boutId,int redScore,int blueScore,long winnerId,string reason,string judges,string resultCode,int redClass,int blueClass,int durationSeconds,bool isClean,int red4=0,int red2=0,int red1=0,int blue4=0,int blue2=0,int blue1=0){
         using var c=Open();
-        string old="";
-        using(var oldq=c.CreateCommand()){oldq.CommandText="SELECT COALESCE(red_score,''),COALESCE(blue_score,''),COALESCE(winner_id,''),COALESCE(reason,''),COALESCE(result_code,'') FROM bouts WHERE id=$id";oldq.Parameters.AddWithValue("$id",boutId);using var r=oldq.ExecuteReader();if(r.Read())old=$"{r.GetValue(0)}:{r.GetValue(1)} winner={r.GetValue(2)} {r.GetValue(3)} {r.GetValue(4)}";}
+        string old="";long categoryId=0;
+        using(var oldq=c.CreateCommand()){oldq.CommandText="SELECT category_id,COALESCE(red_score,''),COALESCE(blue_score,''),COALESCE(winner_id,''),COALESCE(reason,''),COALESCE(result_code,'') FROM bouts WHERE id=$id";oldq.Parameters.AddWithValue("$id",boutId);using var r=oldq.ExecuteReader();if(r.Read()){categoryId=r.GetInt64(0);old=$"{r.GetValue(1)}:{r.GetValue(2)} winner={r.GetValue(3)} {r.GetValue(4)} {r.GetValue(5)}";}}
         using var q=c.CreateCommand();q.CommandText=@"UPDATE bouts SET red_score=$rs,blue_score=$bs,winner_id=$w,reason=$r,judges=$j,status='Завершён',
             result_code=$rc,red_class=$rcl,blue_class=$bcl,duration_seconds=$dur,is_clean=$clean,red_4=$r4,red_2=$r2,red_1=$r1,blue_4=$b4,blue_2=$b2,blue_1=$b1 WHERE id=$id";
         q.Parameters.AddWithValue("$rs",redScore);q.Parameters.AddWithValue("$bs",blueScore);q.Parameters.AddWithValue("$w",winnerId);q.Parameters.AddWithValue("$r",reason);q.Parameters.AddWithValue("$j",judges);
         q.Parameters.AddWithValue("$rc",resultCode);q.Parameters.AddWithValue("$rcl",redClass);q.Parameters.AddWithValue("$bcl",blueClass);q.Parameters.AddWithValue("$dur",durationSeconds);q.Parameters.AddWithValue("$clean",isClean?1:0);
         q.Parameters.AddWithValue("$r4",red4);q.Parameters.AddWithValue("$r2",red2);q.Parameters.AddWithValue("$r1",red1);q.Parameters.AddWithValue("$b4",blue4);q.Parameters.AddWithValue("$b2",blue2);q.Parameters.AddWithValue("$b1",blue1);q.Parameters.AddWithValue("$id",boutId);q.ExecuteNonQuery();
+        if(categoryId>0){
+            using(var d=c.CreateCommand()){d.CommandText="DELETE FROM placements WHERE category_id=$c";d.Parameters.AddWithValue("$c",categoryId);d.ExecuteNonQuery();}
+            using(var st=c.CreateCommand()){st.CommandText="UPDATE categories SET status='Проводится' WHERE id=$c";st.Parameters.AddWithValue("$c",categoryId);st.ExecuteNonQuery();}
+        }
         Audit($"Результат поединка {boutId}: было [{old}], стало [{redScore}:{blueScore} winner={winnerId} {reason} {resultCode}]");
     }
     public void SetBoutResult(long boutId,int redScore,int blueScore,long winnerId,string reason,string judges){
@@ -308,6 +312,9 @@ public sealed class Database {
     }
     public bool HasCompletedFutureDependency(long categoryId,long athleteId,int afterBoutNo){
         using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT COUNT(*) FROM bouts WHERE category_id=$c AND bout_no>$n AND status='Завершён' AND (red_id=$a OR blue_id=$a)";q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$n",afterBoutNo);q.Parameters.AddWithValue("$a",athleteId);return Convert.ToInt32(q.ExecuteScalar())>0;
+    }
+    public void SetCategoryStatus(long categoryId,string status){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE categories SET status=$s WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",categoryId);q.ExecuteNonQuery();Audit($"Статус категории {categoryId}: {status}");
     }
     public void ClearPlacements(long categoryId){using var c=Open();using var q=c.CreateCommand();q.CommandText="DELETE FROM placements WHERE category_id=$c";q.Parameters.AddWithValue("$c",categoryId);q.ExecuteNonQuery();}
     public void SavePlacement(long categoryId,long athleteId,int place,string source){using var c=Open();using var q=c.CreateCommand();q.CommandText="INSERT INTO placements(category_id,athlete_id,place,source) VALUES($c,$a,$p,$s)";q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$a",athleteId);q.Parameters.AddWithValue("$p",place);q.Parameters.AddWithValue("$s",source);q.ExecuteNonQuery();}

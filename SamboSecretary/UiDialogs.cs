@@ -103,10 +103,10 @@ public sealed class ResultDialog:Form{
     public ResultDialog(string red,string blue,string defaultJudges){
         Text="Результат поединка";Width=680;Height=610;StartPosition=FormStartPosition.CenterParent;
         Winner.Items.AddRange([red,blue]);Winner.SelectedIndex=0;
-        Reason.Items.AddRange(["По очкам","Чистая победа","Болевой приём","Явное преимущество","Техническая победа","По замечаниям","Снятие врачом / травма","Неявка","Дисквалификация"]);
+        Reason.Items.AddRange(["По очкам","По активности","Чистая победа","Болевой приём","Явное преимущество","Техническая победа","По замечаниям","Неявка / опоздание — снятие со схватки","Снятие врачом с соревнований","Дисквалификация с соревнований","Нокаут","Два нокдауна","Потеря сознания при удушающем"]);
         Reason.SelectedIndex=0;
         ClassCode.Items.AddRange(["Авто","4:0","3:1","3:0","2:0","0:0"]);ClassCode.SelectedIndex=0;
-        Reason.SelectedIndexChanged+=(s,e)=>{Clean.Checked=Reason.Text is "Чистая победа" or "Болевой приём" or "Явное преимущество";};
+        Reason.SelectedIndexChanged+=(s,e)=>{Clean.Checked=Reason.Text is "Чистая победа" or "Болевой приём" or "Явное преимущество" or "Нокаут" or "Два нокдауна" or "Потеря сознания при удушающем";};
         Judges.Text=defaultJudges;
         var time=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true};time.Controls.Add(Minutes);time.Controls.Add(new Label{Text="мин",AutoSize=true,Margin=new Padding(3,7,8,0)});time.Controls.Add(Seconds);time.Controls.Add(new Label{Text="сек",AutoSize=true,Margin=new Padding(3,7,0,0)});
         var p=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Padding=new Padding(14),AutoScroll=true};

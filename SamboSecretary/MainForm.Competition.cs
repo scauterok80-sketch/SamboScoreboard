@@ -332,8 +332,18 @@ public sealed partial class MainForm{
             File.WriteAllLines(path,new[]{title}.Concat(lines),System.Text.Encoding.UTF8);db.Audit($"Сформирован снимок протокола: {Path.GetFileName(path)}");
         }catch{}
         var pd=new PrintDocument();pd.DocumentName=title;
-        pd.PrintPage+=(s,e)=>{float y=e.MarginBounds.Top;using var head=new Font("Arial",14,FontStyle.Bold);using var font=new Font("Arial",9);e.Graphics!.DrawString(title,head,Brushes.Black,e.MarginBounds.Left,y);y+=34;
-            while(index<lines.Count&&y<e.MarginBounds.Bottom-18){e.Graphics.DrawString(lines[index++],font,Brushes.Black,new RectangleF(e.MarginBounds.Left,y,e.MarginBounds.Width,40));y+=20;}e.HasMorePages=index<lines.Count;};
+        pd.PrintPage+=(s,e)=>{
+            float y=e.MarginBounds.Top;using var head=new Font("Arial",14,FontStyle.Bold);using var font=new Font("Arial",9);
+            e.Graphics!.DrawString(title,head,Brushes.Black,e.MarginBounds.Left,y);y+=head.GetHeight(e.Graphics)+14;
+            while(index<lines.Count){
+                string line=lines[index];var measured=e.Graphics.MeasureString(string.IsNullOrEmpty(line)?" ":line,font,e.MarginBounds.Width);
+                float h=Math.Max(font.GetHeight(e.Graphics)+3,measured.Height+3);
+                if(y+h>e.MarginBounds.Bottom){e.HasMorePages=true;return;}
+                e.Graphics.DrawString(line,font,Brushes.Black,new RectangleF(e.MarginBounds.Left,y,e.MarginBounds.Width,h));
+                y+=h;index++;
+            }
+            e.HasMorePages=false;
+        };
         using var dlg=new PrintPreviewDialog{Document=pd,Width=1100,Height=800};dlg.ShowDialog(this);
     }
     void BackupClick(object? s,EventArgs e){var d=Path.Combine(root,"Backups");Directory.CreateDirectory(d);var p=Path.Combine(d,$"sambo_{DateTime.Now:yyyyMMdd_HHmmss}.db");File.Copy(db.FileName,p,true);MessageBox.Show($"Резервная копия создана:\n{p}");}

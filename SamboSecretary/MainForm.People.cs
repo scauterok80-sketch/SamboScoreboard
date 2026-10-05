@@ -123,33 +123,51 @@ public sealed partial class MainForm{
             string M(string field)=>m.TryGetValue(field,out var h)?h:"";
             string V(Dictionary<string,string> r,string field)=>ExcelImporter.Value(r,M(field));
             var parsed=new List<(Dictionary<string,string> Row,string Name)>();
-            var invalid=new List<string>();
-            int rowNo=1;
+            var invalid=new List<string>();int rowNo=1;
             foreach(var row in data.Rows){
-                rowNo++;
-                var whole=V(row,"ФИО");string name,error;bool ok;
+                rowNo++;var whole=V(row,"ФИО");string name,error;bool ok;
                 if(whole!="")ok=NameNormalizer.TryNormalizeImported(out name,out error,whole);
                 else ok=NameNormalizer.TryNormalizeImported(out name,out error,V(row,"Фамилия"),V(row,"Имя"),V(row,"Отчество"));
-                if(ok)parsed.Add((row,name));
-                else invalid.Add($"строка {rowNo}: {error}");
+                if(ok)parsed.Add((row,name));else invalid.Add($"строка {rowNo}: {error}");
             }
-            var existing=db.Athletes().Select(a=>a.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            int dup=parsed.Count(x=>existing.Contains(x.Name));bool importDup=false;
-            if(dup>0){
-                var ans=MessageBox.Show($"Найдено совпадений по ФИО: {dup}.\n\nДа — импортировать и совпадения.\nНет — пропустить совпадения.\nОтмена — отменить импорт.","Дубликаты",MessageBoxButtons.YesNoCancel,MessageBoxIcon.Question);
-                if(ans==DialogResult.Cancel)return;importDup=ans==DialogResult.Yes;
+            if(invalid.Count>0){
+                var preview=string.Join("\n",invalid.Take(15))+(invalid.Count>15?"\n...":"");
+                if(MessageBox.Show($"Обнаружено неоднозначных/ошибочных строк: {invalid.Count}. Они НЕ будут импортированы.\n\n{preview}\n\nПродолжить импорт корректных строк?","Проверка импорта",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)!=DialogResult.Yes)return;
             }
-            int added=0,skipped=0;
+
+            int added=0,merged=0,edited=0,skipped=0;
             foreach(var item in parsed){
-                if(existing.Contains(item.Name)&&!importDup){skipped++;continue;}
-                var row=item.Row;var discipline=V(row,"Дисциплина");if(discipline=="")discipline="Спортивное самбо";
-                var gender=V(row,"Пол");var age=V(row,"Возрастная группа");var weight=V(row,"Весовая категория");
-                var cid=FindCategory(discipline,gender,age,weight);
-                db.AddAthlete(item.Name,V(row,"Дата рождения"),gender,V(row,"Регион"),V(row,"Организация"),V(row,"Команда"),V(row,"Тренер"),V(row,"Разряд"),discipline,age,weight,ParseDouble(V(row,"Заявленный вес")),cid);
-                added++;
+                var row=item.Row;
+                string birth=V(row,"Дата рождения"),gender=V(row,"Пол"),region=V(row,"Регион"),organization=V(row,"Организация"),team=V(row,"Команда"),coach=V(row,"Тренер"),rank=V(row,"Разряд");
+                string discipline=V(row,"Дисциплина");if(discipline=="")discipline="Спортивное самбо";
+                string age=V(row,"Возрастная группа"),weight=V(row,"Весовая категория");double? declared=ParseDouble(V(row,"Заявленный вес"));
+                long? cid=FindCategory(discipline,gender,age,weight);
+                var candidates=db.Athletes().Where(a=>string.Equals(a.FullName,item.Name,StringComparison.OrdinalIgnoreCase)).ToList();
+                var existing=candidates.FirstOrDefault(a=>!string.IsNullOrWhiteSpace(birth)&&string.Equals(a.BirthDate,birth,StringComparison.OrdinalIgnoreCase))??candidates.FirstOrDefault();
+                ImportDuplicateAction action=ImportDuplicateAction.KeepBoth;
+                if(existing!=null){
+                    using var dd=new DuplicateImportDialog(existing,item.Name,birth,team,weight);
+                    if(dd.ShowDialog(this)!=DialogResult.OK){skipped++;continue;}action=dd.Action;
+                }
+                if(action==ImportDuplicateAction.Skip){skipped++;continue;}
+                if(action==ImportDuplicateAction.Merge&&existing!=null){
+                    string Pick(string oldValue,string newValue)=>string.IsNullOrWhiteSpace(oldValue)?newValue:oldValue;
+                    try{
+                        db.UpdateAthlete(existing.Id,existing.FullName,Pick(existing.BirthDate,birth),Pick(existing.Gender,gender),Pick(existing.Region,region),Pick(existing.Organization,organization),Pick(existing.Team,team),Pick(existing.Coach,coach),Pick(existing.Rank,rank),Pick(existing.Discipline,discipline),Pick(existing.AgeGroup,age),Pick(existing.WeightCategory,weight),existing.DeclaredWeight??declared,existing.CategoryId??cid);
+                        db.Audit($"Импорт: объединена карточка спортсмена {existing.Id}");merged++;
+                    }catch(Exception ex){MessageBox.Show(ex.Message,$"Не удалось объединить {item.Name}",MessageBoxButtons.OK,MessageBoxIcon.Warning);skipped++;}
+                    continue;
+                }
+                if(action==ImportDuplicateAction.Edit){
+                    using var d=new AthleteDialog();d.FullName.Text=item.Name;d.Birth.Text=birth;if(d.Gender.Items.Contains(gender))d.Gender.SelectedItem=gender;d.Region.Text=region;d.Organization.Text=organization;d.Team.Text=team;d.Coach.Text=coach;d.Rank.Text=rank;if(d.Discipline.Items.Contains(discipline))d.Discipline.SelectedItem=discipline;d.Age.Text=age;d.Weight.Text=weight;d.DeclaredWeight.Text=declared?.ToString(System.Globalization.CultureInfo.InvariantCulture)??"";
+                    if(d.ShowDialog(this)!=DialogResult.OK||string.IsNullOrWhiteSpace(d.FullName.Text)){skipped++;continue;}
+                    cid=FindCategory(d.Discipline.Text,d.Gender.Text,d.Age.Text,d.Weight.Text);
+                    db.AddAthlete(d.FullName.Text,d.Birth.Text,d.Gender.Text,d.Region.Text,d.Organization.Text,d.Team.Text,d.Coach.Text,d.Rank.Text,d.Discipline.Text,d.Age.Text,d.Weight.Text,ParseDouble(d.DeclaredWeight.Text),cid);edited++;continue;
+                }
+                db.AddAthlete(item.Name,birth,gender,region,organization,team,coach,rank,discipline,age,weight,declared,cid);added++;
             }
-            var bad=invalid.Count==0?"":$"\nОшибочных/неоднозначных строк: {invalid.Count}\n"+string.Join("\n",invalid.Take(10))+(invalid.Count>10?"\n...":"");
-            MessageBox.Show($"Импорт завершён.\nДобавлено: {added}\nПропущено совпадений: {skipped}{bad}");db.Audit($"Импорт Excel: добавлено {added}, дубликатов пропущено {skipped}, неоднозначных строк {invalid.Count}");AutoBackup();ReloadAll();
+            MessageBox.Show($"Импорт завершён.\nДобавлено: {added}\nОбъединено: {merged}\nДобавлено после редактирования: {edited}\nПропущено: {skipped}\nОшибочных строк: {invalid.Count}");
+            db.Audit($"Импорт Excel: добавлено {added}, объединено {merged}, отредактировано {edited}, пропущено {skipped}, ошибочных строк {invalid.Count}");AutoBackup();ReloadAll();
         }catch(Exception ex){MessageBox.Show(ex.Message,"Ошибка импорта",MessageBoxButtons.OK,MessageBoxIcon.Error);}
     }
 

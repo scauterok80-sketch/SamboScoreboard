@@ -15,15 +15,15 @@ public sealed partial class MainForm{
 
     void ReloadMats(){
         int mats=(int)tMats.Value;var cats=db.Categories().ToDictionary(x=>x.Id,x=>$"{x.Discipline} | {x.Gender} | {x.AgeGroup} | {x.WeightCategory}");
-        var all=db.Categories().SelectMany(c=>db.Bouts(c.Id)).OrderBy(b=>b.Mat).ThenBy(b=>b.Status=="Идёт"?0:b.Status=="Вызван"?1:b.Status=="Готов"?2:3).ThenBy(b=>b.BoutNo).ToList();
+        var all=db.Categories().SelectMany(c=>db.Bouts(c.Id)).OrderBy(b=>b.Mat).ThenBy(b=>b.Status=="Идёт"?0:b.Status=="Вызван"?1:b.Status=="Готов"?2:3).ThenBy(b=>string.IsNullOrWhiteSpace(b.ScheduledTime)?"99:99":b.ScheduledTime).ThenBy(b=>b.DisplayNo).ToList();
         var summary=new List<object>();
         for(int m=1;m<=mats;m++){
             var q=all.Where(b=>b.Mat==m&&b.Status!="Завершён").ToList();
             var current=q.FirstOrDefault(b=>b.Status=="Идёт")??q.FirstOrDefault(b=>b.Status=="Вызван");
             var next=q.FirstOrDefault(b=>b.Id!=current?.Id&&(b.Status=="Готов"||b.Status=="Ожидает"));
-            summary.Add(new{Ковёр=m,Текущая=current==null?"—":$"№{current.BoutNo} {current.RedName} — {current.BlueName}",Следующая=next==null?"—":$"№{next.BoutNo} {next.RedName} — {next.BlueName}",Ожидают=q.Count(b=>b.Id!=current?.Id&&b.Id!=next?.Id)});
+            summary.Add(new{Ковёр=m,Текущая=current==null?"—":$"№{current.DisplayNo} {current.RedName} — {current.BlueName}",Следующая=next==null?"—":$"№{next.DisplayNo} {next.RedName} — {next.BlueName}",Ожидают=q.Count(b=>b.Id!=current?.Id&&b.Id!=next?.Id)});
         }
         matSummaryGrid.DataSource=summary;
-        matQueueGrid.DataSource=all.Select(b=>new{Ковёр=b.Mat,Категория=cats.TryGetValue(b.CategoryId,out var n)?n:b.CategoryId.ToString(),Номер=b.BoutNo,Этап=b.Stage,Красный=b.RedName,Синий=b.BlueName,Статус=b.Status}).ToList();
+        matQueueGrid.DataSource=all.Select(b=>new{Ковёр=b.Mat,Категория=cats.TryGetValue(b.CategoryId,out var n)?n:b.CategoryId.ToString(),Номер=b.DisplayNo,План=b.ScheduledTime,Этап=b.Stage,Красный=b.RedName,Синий=b.BlueName,Статус=b.Status}).ToList();
     }
 }

@@ -31,11 +31,28 @@ jobs:
       - name: Build installer
         shell: powershell
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\SamboSecretary.iss'
+      - name: Smoke test installer and installed application
+        shell: powershell
+        run: |
+          $setup = Resolve-Path ".\installer\output\SamboSecretary_Setup_3.0.0_win64.exe"
+          $installDir = Join-Path $env:TEMP "SamboSecretarySmokeInstall"
+          if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART",("/DIR="+$installDir) -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
+          $exe = Join-Path $installDir "SamboSecretary.exe"
+          if (!(Test-Path $exe)) { throw "Installed SamboSecretary.exe not found" }
+          & $exe --selftest
+          if ($LASTEXITCODE -ne 0) { throw "Installed application self-test failed with code $LASTEXITCODE" }
+          $un = Join-Path $installDir "unins000.exe"
+          if (Test-Path $un) {
+            $u = Start-Process $un -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -PassThru -Wait
+            if ($u.ExitCode -ne 0) { throw "Uninstaller exit code $($u.ExitCode)" }
+          }
       - name: Package installer
         shell: powershell
-        run: Compress-Archive -Path installer\output\SamboSecretary_Setup_2.0.0_win64.exe,README_RU.txt -DestinationPath SamboSecretary_2.0.0_Windows_x64.zip
+        run: Compress-Archive -Path installer\output\SamboSecretary_Setup_3.0.0_win64.exe,README_RU.txt -DestinationPath SamboSecretary_3.0.0_Windows_x64.zip
       - name: Upload installer package
         uses: actions/upload-artifact@v4
         with:
           name: SamboSecretary-Installer-Windows-x64
-          path: SamboSecretary_2.0.0_Windows_x64.zip
+          path: SamboSecretary_3.0.0_Windows_x64.zip

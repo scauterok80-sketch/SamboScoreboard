@@ -245,6 +245,11 @@ public sealed class Database {
         using var c=Open();
         if(status=="Завершён")throw new InvalidOperationException("Статус «Завершён» устанавливается только после внесения результата поединка.");
         if(status=="Идёт"){using var chk=c.CreateCommand();chk.CommandText="SELECT COUNT(*) FROM bouts WHERE id<>$id AND mat=$m AND status='Идёт'";chk.Parameters.AddWithValue("$id",boutId);chk.Parameters.AddWithValue("$m",mat);if(Convert.ToInt32(chk.ExecuteScalar())>0)throw new InvalidOperationException($"На ковре {mat} уже есть поединок со статусом «Идёт».");}
+        if(displayNo.HasValue){
+            using var chk=c.CreateCommand();chk.CommandText=@"SELECT COUNT(*) FROM bouts WHERE id<>$id AND category_id=(SELECT category_id FROM bouts WHERE id=$id) AND COALESCE(NULLIF(display_no,0),bout_no)=$dn";
+            chk.Parameters.AddWithValue("$id",boutId);chk.Parameters.AddWithValue("$dn",displayNo.Value);
+            if(Convert.ToInt32(chk.ExecuteScalar())>0)throw new InvalidOperationException($"Номер поединка {displayNo.Value} уже используется в этой категории.");
+        }
         using var q=c.CreateCommand();q.CommandText="UPDATE bouts SET status=$s,mat=$m,scheduled_time=$t,display_no=COALESCE($dn,display_no) WHERE id=$id";
         q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$m",mat);q.Parameters.AddWithValue("$t",scheduledTime??"");q.Parameters.AddWithValue("$dn",(object?)displayNo??DBNull.Value);q.Parameters.AddWithValue("$id",boutId);q.ExecuteNonQuery();Audit($"Поединок {boutId}: видимый № {displayNo?.ToString()??"без изменения"}, статус {status}, ковёр {mat}, время {scheduledTime}");
     }

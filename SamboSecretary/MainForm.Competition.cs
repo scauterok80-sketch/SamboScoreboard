@@ -98,10 +98,12 @@ public sealed partial class MainForm{
         if(drawMode.Text!="Полностью автоматическая"){
             using var d=new DrawPositionDialog(athletes,size,drawMode.Text=="Ручная");if(d.ShowDialog(this)!=DialogResult.OK)return;fixedPos=d.Positions;
         }
-        var slots=separateTeams.Checked&&drawMode.Text!="Ручная"
-            ?BuildSeparatedOlympicSlots(athletes,size,fixedPos)
-            :TournamentEngine.Draw(athletes.Select(a=>a.Id).ToList(),size,drawMode.Text=="Ручная"?DrawMode.Manual:drawMode.Text.StartsWith("Посев")?DrawMode.SeededAuto:DrawMode.FullAuto,fixedPos);
-        if(drawMode.Text=="Ручная"&&fixedPos!=null){slots=Enumerable.Repeat<long?>(null,size).ToList();foreach(var kv in fixedPos)slots[kv.Value-1]=kv.Key;}
+        List<long?> slots;
+        try{
+            slots=separateTeams.Checked&&drawMode.Text!="Ручная"
+                ?BuildSeparatedOlympicSlots(athletes,size,fixedPos)
+                :TournamentEngine.Draw(athletes.Select(a=>a.Id).ToList(),size,drawMode.Text=="Ручная"?DrawMode.Manual:drawMode.Text.StartsWith("Посев")?DrawMode.SeededAuto:DrawMode.FullAuto,fixedPos);
+        }catch(Exception ex){MessageBox.Show(ex.Message,"Некорректная олимпийская жеребьёвка",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
         for(int i=0;i<size;i++)db.AddDrawPosition(cid,i+1,slots[i],i<size/2?"A":"B");
         string stage=size==8?"1/4":size==16?"1/8":"1/16";int no=1,mat=1;
         for(int i=0;i<size;i+=2)if(slots[i].HasValue&&slots[i+1].HasValue){db.AddBout(cid,no++,stage,slots[i],slots[i+1],mat);mat=mat%(int)tMats.Value+1;}

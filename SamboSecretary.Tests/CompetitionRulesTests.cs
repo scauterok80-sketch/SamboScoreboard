@@ -52,12 +52,11 @@ public class CompetitionRulesTests{
 
     [Fact]
     public void TechnicalQualityBreaksOtherwiseEqualTie(){
-        var a=new BoutRuleRow(1,1,1,"Круг 1",1,3,"Завершён",4,2,1,"3:1",3,1,240,false,1,0,0,0,1,0,"");
-        var b=new BoutRuleRow(2,1,2,"Круг 1",2,4,"Завершён",4,2,2,"3:1",3,1,240,false,0,2,0,0,1,0,"");
-        var c1=new BoutRuleRow(3,1,3,"Круг 1",1,2,"Завершён",1,2,2,"3:1",1,3,240,false,0,0,1,0,1,0,"");
-        var c2=new BoutRuleRow(4,1,4,"Круг 1",3,4,"Завершён",2,1,3,"3:1",3,1,240,false,0,1,0,0,0,1,"");
-        var r=CompetitionRules.RankRoundRobin(new long[]{1,2,3,4},new[]{a,b,c1,c2});
-        Assert.True(r.Ordered.IndexOf(1)<r.Ordered.IndexOf(2));
+        var b1=new BoutRuleRow(1,1,1,"Круг 1",1,2,"Завершён",4,2,1,"3:1",3,1,240,false,1,0,0,0,1,0,"");
+        var b2=new BoutRuleRow(2,1,2,"Круг 1",2,3,"Завершён",4,2,2,"3:1",3,1,240,false,0,2,0,0,0,2,"");
+        var b3=new BoutRuleRow(3,1,3,"Круг 1",3,1,"Завершён",4,2,3,"3:1",3,1,240,false,0,0,4,0,1,0,"");
+        var r=CompetitionRules.RankRoundRobin(new long[]{1,2,3},new[]{b1,b2,b3});
+        Assert.Equal(new long[]{1,2,3},r.Ordered);Assert.Empty(r.Unresolved);
     }
 
     [Fact]

@@ -7,7 +7,7 @@ public record RankingResult(List<long> Ordered,List<List<long>> Unresolved,Dicti
 public static class CompetitionRules{
     public static ClassificationResult ClassificationFor(string resultCode,int redScore,int blueScore,bool redWon,string reason){
         string code=resultCode?.Trim()??"";
-        bool clean=reason is "Чистая победа" or "Болевой приём" or "Явное преимущество";
+        bool clean=reason is "Чистая победа" or "Болевой приём" or "Явное преимущество" or "Нокаут" or "Два нокдауна" or "Потеря сознания при удушающем";
         if(string.IsNullOrWhiteSpace(code)){
             if(clean||reason.Contains("Дисквали",StringComparison.OrdinalIgnoreCase)||reason.Contains("Снятие врачом",StringComparison.OrdinalIgnoreCase)||reason.Contains("Неявка",StringComparison.OrdinalIgnoreCase)||reason.Contains("Техничес",StringComparison.OrdinalIgnoreCase)) code="4:0";
             else{
@@ -111,9 +111,12 @@ public static class CompetitionRules{
         if(b.WinnerId==loserId)return true;
         var r=b.Reason??"";
         return !r.Contains("Дисквали",StringComparison.OrdinalIgnoreCase)
-            && !r.Contains("Неяв",StringComparison.OrdinalIgnoreCase)
             && !r.Contains("Снятие врачом",StringComparison.OrdinalIgnoreCase)
-            && !r.Contains("травм",StringComparison.OrdinalIgnoreCase);
+            && !r.Contains("снят с соревнований",StringComparison.OrdinalIgnoreCase)
+            && !r.Contains("травм",StringComparison.OrdinalIgnoreCase)
+            && !r.Contains("Нокаут",StringComparison.OrdinalIgnoreCase)
+            && !r.Contains("Два нокдауна",StringComparison.OrdinalIgnoreCase)
+            && !r.Contains("Потеря сознания",StringComparison.OrdinalIgnoreCase);
     }
     public static bool IsDisqualified(long athleteId,IEnumerable<BoutRuleRow> bouts){
         return bouts.Any(b=>b.Status=="Завершён"&&(b.RedId==athleteId||b.BlueId==athleteId)&&b.WinnerId!=athleteId&&(b.Reason??"").Contains("Дисквали",StringComparison.OrdinalIgnoreCase));

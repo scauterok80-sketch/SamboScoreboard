@@ -59,6 +59,22 @@ public sealed class JudgeDialog:Form{
     static void Add(TableLayoutPanel p,string label,Control c){int r=p.RowCount++;p.RowStyles.Add(new RowStyle(SizeType.AutoSize));p.Controls.Add(new Label{Text=label,AutoSize=true,Margin=new Padding(3,9,12,3)},0,r);c.Dock=DockStyle.Fill;p.Controls.Add(c,1,r);}
 }
 
+
+public enum ImportDuplicateAction{Skip,Merge,KeepBoth,Edit}
+
+public sealed class DuplicateImportDialog:Form{
+    public ImportDuplicateAction Action{get;private set;}=ImportDuplicateAction.Skip;
+    public DuplicateImportDialog(Athlete existing,string importedName,string birth,string team,string weight){
+        Text="Возможный дубликат";Width=700;Height=330;StartPosition=FormStartPosition.CenterParent;
+        var info=new Label{Dock=DockStyle.Fill,Padding=new Padding(16),AutoSize=false,Text=
+            $"В базе уже есть похожий спортсмен:\r\n\r\nСуществующий: {existing.FullName} | {existing.BirthDate} | {existing.Team} | {existing.WeightCategory}\r\nИмпорт: {importedName} | {birth} | {team} | {weight}\r\n\r\n«Объединить» заполнит только пустые поля существующей карточки. «Редактировать» позволит создать отдельную исправленную карточку."};
+        var buttons=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=70,Padding=new Padding(10),FlowDirection=FlowDirection.LeftToRight};
+        void Add(string text,ImportDuplicateAction action){var b=new Button{Text=text,AutoSize=true,Margin=new Padding(6)};b.Click+=(s,e)=>{Action=action;DialogResult=DialogResult.OK;Close();};buttons.Controls.Add(b);}
+        Add("Объединить",ImportDuplicateAction.Merge);Add("Оставить обоих",ImportDuplicateAction.KeepBoth);Add("Редактировать импорт",ImportDuplicateAction.Edit);Add("Пропустить",ImportDuplicateAction.Skip);
+        Controls.Add(info);Controls.Add(buttons);
+    }
+}
+
 public sealed class ImportMappingDialog:Form{
     readonly Dictionary<string,ComboBox> boxes=new();
     public Dictionary<string,string> Mapping=>boxes.ToDictionary(x=>x.Key,x=>x.Value.SelectedItem?.ToString()??"");

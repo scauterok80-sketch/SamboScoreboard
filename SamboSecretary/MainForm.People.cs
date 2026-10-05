@@ -1,6 +1,9 @@
 namespace SamboSecretary;
 
 public sealed partial class MainForm{
+    readonly ComboBox judgeAssignmentCategory=new(){DropDownStyle=ComboBoxStyle.DropDownList,Width=340};
+    readonly NumericUpDown judgeAssignmentMat=new(){Minimum=1,Maximum=12,Value=1,Width=70};
+    readonly DataGridView judgeAssignmentGrid=Grid();
     void BuildTournamentTab(){
         var page=Page("Турнир");
         var p=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(18),MaximumSize=new Size(900,0)};
@@ -109,7 +112,22 @@ public sealed partial class MainForm{
     void ReloadWeigh(){weighGrid.DataSource=db.Athletes().Select(x=>new{ID=x.Id,ФИО=x.FullName,Категория=x.WeightCategory,Заявленный=x.DeclaredWeight,Фактический=x.ActualWeight,Статус=x.Status,Команда=x.Team}).ToList();}
 
     void BuildJudgesTab(){
-        var page=Page("Судьи");var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=48,Padding=new Padding(4)};bar.Controls.Add(Btn("Добавить судью",(s,e)=>{using var d=new JudgeDialog();if(d.ShowDialog(this)==DialogResult.OK&&d.NameBox.Text.Trim()!=""){db.AddJudge(d.NameBox.Text,d.Region.Text,d.Category.Text,d.Role.Text);ReloadAll();}}));page.Controls.Add(judgeGrid);page.Controls.Add(bar);
+        var page=Page("Судьи");var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=88,Padding=new Padding(4),AutoScroll=true};
+        bar.Controls.Add(Btn("Добавить судью",(s,e)=>{using var d=new JudgeDialog();if(d.ShowDialog(this)==DialogResult.OK&&d.NameBox.Text.Trim()!=""){db.AddJudge(d.NameBox.Text,d.Region.Text,d.Category.Text,d.Role.Text);ReloadAll();}}));
+        bar.Controls.Add(new Label{Text="Категория:",AutoSize=true,Margin=new Padding(12,13,3,0)});bar.Controls.Add(judgeAssignmentCategory);
+        bar.Controls.Add(new Label{Text="Ковёр:",AutoSize=true,Margin=new Padding(10,13,3,0)});bar.Controls.Add(judgeAssignmentMat);
+        bar.Controls.Add(Btn("Назначить выбранного судью",(s,e)=>{
+            var jid=SelectedId(judgeGrid);var cid=SelectedCategory(judgeAssignmentCategory);if(!jid.HasValue||!cid.HasValue){MessageBox.Show("Выберите судью и категорию.");return;}
+            var j=db.Judges().First(x=>x.Id==jid.Value);db.AssignJudge(cid.Value,jid.Value,(int)judgeAssignmentMat.Value,j.Role);ReloadJudgeAssignments();
+        }));
+        bar.Controls.Add(Btn("Удалить назначение",(s,e)=>{var id=SelectedId(judgeAssignmentGrid);if(id.HasValue){db.RemoveJudgeAssignment(id.Value);ReloadJudgeAssignments();}}));
+        judgeAssignmentCategory.SelectedIndexChanged+=(s,e)=>ReloadJudgeAssignments();
+        var split=new SplitContainer{Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=300};split.Panel1.Controls.Add(judgeGrid);split.Panel2.Controls.Add(judgeAssignmentGrid);
+        page.Controls.Add(split);page.Controls.Add(bar);
     }
     void ReloadJudges(){judgeGrid.DataSource=db.Judges().Select(x=>new{ID=x.Id,ФИО=x.Name,Регион=x.Region,Категория=x.Category,Роль=x.Role}).ToList();}
+    void ReloadJudgeAssignments(){
+        var cid=SelectedCategory(judgeAssignmentCategory);var cats=db.Categories().ToDictionary(x=>x.Id,x=>$"{x.Discipline} {x.Gender} {x.AgeGroup} {x.WeightCategory}");
+        judgeAssignmentGrid.DataSource=db.JudgeAssignments(cid).Select(x=>new{ID=x.Id,Категория=cats.TryGetValue(x.CategoryId,out var n)?n:x.CategoryId.ToString(),Ковёр=x.Mat,ФИО=x.JudgeName,Роль=x.Role}).ToList();
+    }
 }

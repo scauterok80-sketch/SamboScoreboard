@@ -243,6 +243,9 @@ public sealed partial class MainForm{
         p.Controls.Add(Btn("Пустой протокол взвешивания",(s,e)=>PrintLines("ПРОТОКОЛ ВЗВЕШИВАНИЯ",WeighLines(false))));
         p.Controls.Add(Btn("Заполненный протокол взвешивания",(s,e)=>PrintLines("ПРОТОКОЛ ВЗВЕШИВАНИЯ — РЕЗУЛЬТАТ",WeighLines(true))));
         p.Controls.Add(Btn("Список судей",(s,e)=>PrintLines("СУДЕЙСКИЙ КОРПУС",JudgeLines())));
+        p.Controls.Add(Btn("Протокол жеребьёвки",(s,e)=>{var cid=SelectedCategory(drawCategory)??SelectedCategory(boutCategory);if(cid.HasValue)PrintLines("ПРОТОКОЛ ЖЕРЕБЬЁВКИ",DrawProtocolLines(cid.Value));else MessageBox.Show("Сначала выберите категорию.");}));
+        p.Controls.Add(Btn("Ход соревнований / сетка",(s,e)=>{var cid=SelectedCategory(boutCategory)??SelectedCategory(drawCategory);if(cid.HasValue)PrintLines("ХОД СОРЕВНОВАНИЙ / СЕТКА",BracketProtocolLines(cid.Value));else MessageBox.Show("Сначала выберите категорию.");}));
+        p.Controls.Add(Btn("Победители и призёры",(s,e)=>PrintLines("ПОБЕДИТЕЛИ И ПРИЗЁРЫ",PrizewinnersLines())));
         p.Controls.Add(Btn("Пустой пакет всех категорий",(s,e)=>PrintLines("ПУСТЫЕ ПРОТОКОЛЫ ВСЕХ КАТЕГОРИЙ",db.Categories().SelectMany(cat=>BlankCategoryLines(cat.Id)))));
         p.Controls.Add(Btn("Пустой протокол выбранной категории",(s,e)=>{var cid=SelectedCategory(boutCategory)??SelectedCategory(drawCategory);if(cid.HasValue)PrintLines("ПУСТОЙ ПРОТОКОЛ КАТЕГОРИИ",BlankCategoryLines(cid.Value));else MessageBox.Show("Сначала выберите категорию.");}));
         p.Controls.Add(Btn("Протокол выбранной категории",(s,e)=>{var cid=SelectedCategory(boutCategory)??SelectedCategory(drawCategory);if(cid.HasValue)PrintLines("ПРОТОКОЛ КАТЕГОРИИ",CategoryLines(cid.Value));else MessageBox.Show("Сначала выберите категорию на вкладке «Поединки» или «Жеребьёвка».");}));
@@ -258,6 +261,37 @@ public sealed partial class MainForm{
     IEnumerable<string> CredentialLines()=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | {a.BirthDate} | {a.Region} | {a.Organization} | {a.Discipline} | {a.AgeGroup} | {a.WeightCategory} | статус: {a.Status} | причина: {a.StatusReason}"));
     IEnumerable<string> WeighLines(bool filled)=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | категория {a.WeightCategory} | заявл. {a.DeclaredWeight?.ToString()??"___"} | факт. {(filled?a.ActualWeight?.ToString()??"___":"___")} | {(filled?a.Status:"________")} | причина {(filled?a.StatusReason:"________")}"));
     IEnumerable<string> JudgeLines()=>HeaderLines().Concat(db.Judges().Select((j,i)=>$"{i+1}. {j.Name} | {j.Region} | {j.Category} | {j.Role} | {j.Notes}"));
+    IEnumerable<string> DrawProtocolLines(long cid){
+        var cat=db.Categories().First(x=>x.Id==cid);var lines=new List<string>();lines.AddRange(HeaderLines());
+        lines.Add($"{cat.Discipline}; {cat.Gender}; {cat.AgeGroup}; {cat.WeightCategory}");
+        lines.Add($"Система: {cat.System}; утешительные: {cat.Repechage}; способ жеребьёвки: {cat.DrawMode}; утверждена: {(cat.DrawApproved?"да":"нет")}");
+        lines.Add("");lines.Add("ПОЗИЦИИ ЖЕРЕБЬЁВКИ:");
+        lines.AddRange(db.DrawPositions(cid).Select(x=>$"{x.Position}. {(string.IsNullOrWhiteSpace(x.Athlete)?"СВОБОДНО":x.Athlete)} {(string.IsNullOrWhiteSpace(x.Group)?"":$"[{x.Group}]")}"));
+        return lines;
+    }
+    IEnumerable<string> BracketProtocolLines(long cid){
+        var cat=db.Categories().First(x=>x.Id==cid);var lines=new List<string>();lines.AddRange(HeaderLines());
+        lines.Add($"{cat.Discipline}; {cat.Gender}; {cat.AgeGroup}; {cat.WeightCategory}; {cat.System}; {cat.Repechage}");lines.Add("");
+        var rules=db.BoutRules(cid).ToDictionary(x=>x.Id);
+        foreach(var b in db.Bouts(cid)){
+            var r=rules[b.Id];
+            string result=b.Status=="Завершён"?$"{b.RedScore}:{b.BlueScore}; {r.ResultCode}; победитель {b.WinnerName}; {b.Reason}":"";
+            lines.Add($"№{b.DisplayNo} | {b.Stage} | {b.RedName} — {b.BlueName} | ковёр {b.Mat} | {b.ScheduledTime} | {b.Status} | {result}");
+        }
+        return lines;
+    }
+    IEnumerable<string> PrizewinnersLines(){
+        var lines=new List<string>();lines.AddRange(HeaderLines());
+        foreach(var cat in db.Categories()){
+            lines.Add($"{cat.Discipline} | {cat.Gender} | {cat.AgeGroup} | {cat.WeightCategory}");
+            var p=db.Placements(cat.Id).Where(x=>x.Place<=3).OrderBy(x=>x.Place).ThenBy(x=>x.Athlete).ToList();
+            if(p.Count==0)lines.Add("  Итоговые места ещё не рассчитаны.");
+            else foreach(var x in p)lines.Add($"  {x.Place} место — {x.Athlete} | {x.Region} | {x.Team}");
+            lines.Add("");
+        }
+        return lines;
+    }
+
     IEnumerable<string> CategoryLines(long cid){
         var c=db.Categories().First(x=>x.Id==cid);var lines=new List<string>();lines.AddRange(HeaderLines());lines.Add($"{c.Discipline}; {c.Gender}; {c.AgeGroup}; {c.WeightCategory}; система: {c.System}; утешительные: {c.Repechage}");lines.Add("");
         var assignments=db.JudgeAssignments(cid);if(assignments.Count>0){lines.Add("СУДЕЙСКИЕ НАЗНАЧЕНИЯ:");lines.AddRange(assignments.Select(x=>$"Ковёр {x.Mat}: {x.Role} — {x.JudgeName}"));lines.Add("");}

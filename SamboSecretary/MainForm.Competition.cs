@@ -49,8 +49,10 @@ public sealed partial class MainForm{
             MessageBox.Show("Для олимпийской системы перед жеребьёвкой обязательно выберите конкретный вариант: «От финалистов», «От полуфиналистов» или «Без утешительных встреч».","Требуется Положение соревнования");
             return;
         }
-        db.UpdateCategorySettings(cid.Value,system,drawRepechage.Text,drawMode.Text);
-        db.ClearBouts(cid.Value);db.ClearDrawPositions(cid.Value);
+        try{
+            db.UpdateCategorySettings(cid.Value,system,drawRepechage.Text,drawMode.Text);
+            db.ClearBouts(cid.Value);db.ClearDrawPositions(cid.Value);
+        }catch(Exception ex){MessageBox.Show(ex.Message,"Жеребьёвка не изменена",MessageBoxButtons.OK,MessageBoxIcon.Warning);return;}
 
         if(system=="Круговая")GenerateRoundRobin(cid.Value,athletes);
         else if(system=="Смешанная")GenerateMixed(cid.Value,athletes);

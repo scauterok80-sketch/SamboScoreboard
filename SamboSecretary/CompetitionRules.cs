@@ -107,8 +107,22 @@ public static class CompetitionRules{
         return 0;
     }
 
+    public static bool CanContinueAfterLoss(BoutRuleRow b,long loserId){
+        if(b.WinnerId==loserId)return true;
+        var r=b.Reason??"";
+        return !r.Contains("Дисквали",StringComparison.OrdinalIgnoreCase)
+            && !r.Contains("Неяв",StringComparison.OrdinalIgnoreCase)
+            && !r.Contains("Снятие врачом",StringComparison.OrdinalIgnoreCase)
+            && !r.Contains("травм",StringComparison.OrdinalIgnoreCase);
+    }
+    public static bool IsDisqualified(long athleteId,IEnumerable<BoutRuleRow> bouts){
+        return bouts.Any(b=>b.Status=="Завершён"&&(b.RedId==athleteId||b.BlueId==athleteId)&&b.WinnerId!=athleteId&&(b.Reason??"").Contains("Дисквали",StringComparison.OrdinalIgnoreCase));
+    }
     public static List<long> DirectLossesTo(long winner,IEnumerable<BoutRuleRow> mainBouts,bool includeSemifinal=true){
         return mainBouts.Where(b=>b.Status=="Завершён"&&b.WinnerId==winner&&StageOrder(b.Stage)>0&&(includeSemifinal||!b.Stage.Contains("Полуфинал")))
-            .OrderBy(b=>StageOrder(b.Stage)).Select(b=>b.RedId==winner?b.BlueId!.Value:b.RedId!.Value).ToList();
+            .OrderBy(b=>StageOrder(b.Stage))
+            .Select(b=>(Bout:b,Loser:b.RedId==winner?b.BlueId!.Value:b.RedId!.Value))
+            .Where(x=>CanContinueAfterLoss(x.Bout,x.Loser))
+            .Select(x=>x.Loser).ToList();
     }
 }

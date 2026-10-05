@@ -1,0 +1,30 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
+namespace SamboSecretary;
+public enum TournamentSystem { RoundRobin, Mixed, Olympic }
+public enum DrawMode { Manual, SeededAuto, FullAuto }
+public static class NameNormalizer {
+ public static string Normalize(params string?[] parts) {
+  var w=parts.Where(x=>!string.IsNullOrWhiteSpace(x)).SelectMany(x=>Regex.Split(x!.Trim(),@"\s+")).Where(x=>x.Length>0).ToArray();
+  if(w.Length==0)return "";
+  var ru=new CultureInfo("ru-RU");
+  string Cap(string s){s=s.ToLower(ru);return char.ToUpper(s[0],ru)+s[1..];}
+  return string.Join(" ",new[]{w[0].ToUpper(ru)}.Concat(w.Skip(1).Select(Cap)));
+ }
+}
+public record Bout(int No,long? Red,long? Blue,string Stage);
+public static class TournamentEngine {
+ public static TournamentSystem[] Allowed(int n)=>n switch{>=2 and <=4=>[TournamentSystem.RoundRobin],>=5 and <=6=>[TournamentSystem.RoundRobin,TournamentSystem.Mixed],7=>[TournamentSystem.Mixed],>=8 and <=32=>[TournamentSystem.Olympic],_=>throw new ArgumentOutOfRangeException(nameof(n))};
+ public static int BracketSize(int n)=>n switch{8=>8,>=9 and <=16=>16,>=17 and <=32=>32,_=>throw new ArgumentOutOfRangeException(nameof(n))};
+ public static (int A,int B) MixedGroups(int n)=>n switch{5=>(2,3),6=>(3,3),7=>(3,4),_=>throw new ArgumentOutOfRangeException(nameof(n))};
+ public static List<Bout> RoundRobin(IReadOnlyList<long> ids){
+  var a=ids.ToList();if(a.Count%2==1)a.Add(0);int n=a.Count,no=1;var r=new List<Bout>();
+  for(int round=0;round<n-1;round++){for(int i=0;i<n/2;i++){var x=a[i];var y=a[n-1-i];if(x!=0&&y!=0)r.Add(new(no++,x,y,$"Круг {round+1}"));}var last=a[^1];a.RemoveAt(a.Count-1);a.Insert(1,last);}return r;
+ }
+ public static List<long?> Draw(IReadOnlyList<long> ids,int size,DrawMode mode,IDictionary<long,int>? seeded=null,int seed=12345){
+  if(ids.Count>size)throw new ArgumentException("Участников больше сетки");var slots=Enumerable.Repeat<long?>(null,size).ToList();seeded??=new Dictionary<long,int>();
+  foreach(var kv in seeded){if(kv.Value<1||kv.Value>size||slots[kv.Value-1]!=null||!ids.Contains(kv.Key))throw new ArgumentException("Некорректный посев");slots[kv.Value-1]=kv.Key;}
+  if(mode==DrawMode.Manual)return slots;var rng=new Random(seed);var rest=ids.Where(x=>!seeded.ContainsKey(x)).OrderBy(_=>rng.Next()).ToList();var free=Enumerable.Range(0,size).Where(i=>slots[i]==null).OrderBy(_=>rng.Next()).ToList();for(int i=0;i<rest.Count;i++)slots[free[i]]=rest[i];return slots;
+ }
+ public static (Bout,Bout) MixedSemis(long A1,long A2,long B1,long B2)=>(new(1,A1,B2,"Полуфинал"),new(2,B1,A2,"Полуфинал"));
+}

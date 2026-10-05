@@ -3,7 +3,7 @@ using ClosedXML.Excel;
 
 namespace SamboSecretary;
 
-public record Tournament(long Id,string Name,string Place,string StartDate,string EndDate,int Mats,string ChiefReferee,string ChiefSecretary);
+public record Tournament(long Id,string Name,string Place,string StartDate,string EndDate,int Mats,string ChiefReferee,string ChiefSecretary,string TeamScheme);
 public record CategoryRow(long Id,string Discipline,string Gender,string AgeGroup,string WeightCategory,string System,string Repechage,string DrawMode,bool DrawApproved,string Status);
 public record Athlete(long Id,string FullName,string BirthDate,string Gender,string Region,string Organization,string Team,string Coach,string Rank,string Discipline,string AgeGroup,string WeightCategory,double? DeclaredWeight,double? ActualWeight,string Status,long? CategoryId);
 public record JudgeRow(long Id,string Name,string Region,string Category,string Role);
@@ -22,8 +22,8 @@ public sealed class Database {
     void Init(){
         using var c=Open();
         Exec(c,@"CREATE TABLE IF NOT EXISTS tournament(
-            id INTEGER PRIMARY KEY CHECK(id=1),name TEXT,place TEXT,start_date TEXT,end_date TEXT,mats INTEGER DEFAULT 1,chief_referee TEXT,chief_secretary TEXT);
-        INSERT OR IGNORE INTO tournament(id,name,place,start_date,end_date,mats,chief_referee,chief_secretary) VALUES(1,'','','','',1,'','');
+            id INTEGER PRIMARY KEY CHECK(id=1),name TEXT,place TEXT,start_date TEXT,end_date TEXT,mats INTEGER DEFAULT 1,chief_referee TEXT,chief_secretary TEXT,team_scheme TEXT DEFAULT '7,5,3,1');
+        INSERT OR IGNORE INTO tournament(id,name,place,start_date,end_date,mats,chief_referee,chief_secretary,team_scheme) VALUES(1,'','','','',1,'','','7,5,3,1');
 
         CREATE TABLE IF NOT EXISTS categories(
             id INTEGER PRIMARY KEY AUTOINCREMENT,discipline TEXT NOT NULL,gender TEXT,age_group TEXT,weight_category TEXT NOT NULL,
@@ -53,10 +53,16 @@ public sealed class Database {
 
         CREATE TABLE IF NOT EXISTS audit(
             id INTEGER PRIMARY KEY AUTOINCREMENT,ts TEXT NOT NULL,action TEXT NOT NULL);");
+        EnsureTournamentColumns(c);
         EnsureAthleteColumns(c);
         EnsureBoutColumns(c);
     }
 
+    void EnsureTournamentColumns(SqliteConnection c){
+        var existing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using(var q=c.CreateCommand()){q.CommandText="PRAGMA table_info(tournament)";using var r=q.ExecuteReader();while(r.Read())existing.Add(r.GetString(1));}
+        if(!existing.Contains("team_scheme"))Exec(c,"ALTER TABLE tournament ADD COLUMN team_scheme TEXT DEFAULT '7,5,3,1'");
+    }
     void EnsureAthleteColumns(SqliteConnection c){
         var required=new Dictionary<string,string>{
             ["birth_date"]="TEXT",["region"]="TEXT",["organization"]="TEXT",["coach"]="TEXT",["rank"]="TEXT",
@@ -90,22 +96,22 @@ public sealed class Database {
     }
 
     public Tournament GetTournament(){
-        using var c=Open(); using var q=c.CreateCommand(); q.CommandText="SELECT id,name,place,start_date,end_date,mats,chief_referee,chief_secretary FROM tournament WHERE id=1";
-        using var r=q.ExecuteReader(); r.Read(); return new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetInt32(5),r.GetString(6),r.GetString(7));
+        using var c=Open(); using var q=c.CreateCommand(); q.CommandText="SELECT id,name,place,start_date,end_date,mats,chief_referee,chief_secretary,COALESCE(team_scheme,'7,5,3,1') FROM tournament WHERE id=1";
+        using var r=q.ExecuteReader(); r.Read(); return new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetInt32(5),r.GetString(6),r.GetString(7),r.GetString(8));
     }
     public void ResetForNewTournament(){
         using var c=Open();using var tx=c.BeginTransaction();
         foreach(var table in new[]{"judge_assignments","placements","bouts","draw_positions","judges","athletes","categories","audit"}){
             using var q=c.CreateCommand();q.Transaction=tx;q.CommandText=$"DELETE FROM {table}";q.ExecuteNonQuery();
         }
-        using(var q=c.CreateCommand()){q.Transaction=tx;q.CommandText="UPDATE tournament SET name='',place='',start_date='',end_date='',mats=1,chief_referee='',chief_secretary='' WHERE id=1";q.ExecuteNonQuery();}
+        using(var q=c.CreateCommand()){q.Transaction=tx;q.CommandText="UPDATE tournament SET name='',place='',start_date='',end_date='',mats=1,chief_referee='',chief_secretary='',team_scheme='7,5,3,1' WHERE id=1";q.ExecuteNonQuery();}
         tx.Commit();Audit("Создан новый турнир");
     }
-    public void SaveTournament(string name,string place,string start,string end,int mats,string chiefReferee,string chiefSecretary){
+    public void SaveTournament(string name,string place,string start,string end,int mats,string chiefReferee,string chiefSecretary,string teamScheme="7,5,3,1"){
         using var c=Open(); using var q=c.CreateCommand();
-        q.CommandText=@"UPDATE tournament SET name=$n,place=$p,start_date=$s,end_date=$e,mats=$m,chief_referee=$cr,chief_secretary=$cs WHERE id=1";
+        q.CommandText=@"UPDATE tournament SET name=$n,place=$p,start_date=$s,end_date=$e,mats=$m,chief_referee=$cr,chief_secretary=$cs,team_scheme=$ts WHERE id=1";
         q.Parameters.AddWithValue("$n",name); q.Parameters.AddWithValue("$p",place); q.Parameters.AddWithValue("$s",start); q.Parameters.AddWithValue("$e",end);
-        q.Parameters.AddWithValue("$m",mats); q.Parameters.AddWithValue("$cr",chiefReferee); q.Parameters.AddWithValue("$cs",chiefSecretary); q.ExecuteNonQuery();
+        q.Parameters.AddWithValue("$m",mats); q.Parameters.AddWithValue("$cr",chiefReferee); q.Parameters.AddWithValue("$cs",chiefSecretary);q.Parameters.AddWithValue("$ts",string.IsNullOrWhiteSpace(teamScheme)?"7,5,3,1":teamScheme); q.ExecuteNonQuery();
         Audit("Сохранены данные турнира");
     }
 

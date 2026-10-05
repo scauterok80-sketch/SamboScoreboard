@@ -41,8 +41,8 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
           $exe = Join-Path $installDir "SamboSecretary.exe"
           if (!(Test-Path $exe)) { throw "Installed SamboSecretary.exe not found" }
-          & $exe --selftest
-          if ($LASTEXITCODE -ne 0) { throw "Installed application self-test failed with code $LASTEXITCODE" }
+          $app = Start-Process $exe -ArgumentList "--selftest" -PassThru -Wait
+          if ($app.ExitCode -ne 0) { throw "Installed application self-test failed with code $($app.ExitCode)" }
           $un = Join-Path $installDir "unins000.exe"
           if (Test-Path $un) {
             $u = Start-Process $un -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -PassThru -Wait

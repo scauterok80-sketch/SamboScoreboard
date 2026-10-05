@@ -23,7 +23,7 @@ public sealed class Database {
         using var c=Open();
         Exec(c,@"CREATE TABLE IF NOT EXISTS tournament(
             id INTEGER PRIMARY KEY CHECK(id=1),name TEXT,place TEXT,start_date TEXT,end_date TEXT,mats INTEGER DEFAULT 1,chief_referee TEXT,chief_secretary TEXT,team_scheme TEXT DEFAULT '7,5,3,1',protocol_header TEXT DEFAULT '',protocol_footer TEXT DEFAULT '');
-        INSERT OR IGNORE INTO tournament(id,name,place,start_date,end_date,mats,chief_referee,chief_secretary,team_scheme,protocol_header,protocol_footer) VALUES(1,'','','','',1,'','','7,5,3,1','','');
+        INSERT OR IGNORE INTO tournament(id,name,place,start_date,end_date,mats,chief_referee,chief_secretary) VALUES(1,'','','','',1,'','');
 
         CREATE TABLE IF NOT EXISTS categories(
             id INTEGER PRIMARY KEY AUTOINCREMENT,discipline TEXT NOT NULL,gender TEXT,age_group TEXT,weight_category TEXT NOT NULL,

@@ -7,7 +7,7 @@ public static class WeightRules{
         max=0;if(string.IsNullOrWhiteSpace(category))return false;
         var s=category.Trim().ToLowerInvariant();
         if(s.Contains("+")||s.Contains("свыше")||s.Contains("более"))return false;
-        var m=Regex.Match(s,@"(d+(?:[.,]d+)?)");
+        var m=Regex.Match(s,@"(\\d+(?:[.,]\\d+)?)");
         if(!m.Success)return false;
         return double.TryParse(m.Groups[1].Value.Replace(',','.'),NumberStyles.Any,CultureInfo.InvariantCulture,out max);
     }

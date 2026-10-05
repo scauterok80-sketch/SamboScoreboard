@@ -9,14 +9,28 @@ public sealed partial class MainForm{
         var page=Page("Турнир");
         var p=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(18),MaximumSize=new Size(900,0)};
         AddField(p,"Название соревнования",tName);AddField(p,"Место проведения",tPlace);AddField(p,"Дата начала",tStart);AddField(p,"Дата окончания",tEnd);AddField(p,"Количество ковров",tMats);AddField(p,"Главный судья",tChiefRef);AddField(p,"Главный секретарь",tChiefSec);
-        var save=Btn("Сохранить данные турнира",(s,e)=>{db.SaveTournament(tName.Text,tPlace.Text,tStart.Text,tEnd.Text,(int)tMats.Value,tChiefRef.Text,tChiefSec.Text);MessageBox.Show("Данные турнира сохранены.");ReloadAudit();});
-        p.Controls.Add(save,1,p.RowCount);int rr=p.RowCount++;p.Controls.Add(tournamentStats,0,rr);p.SetColumnSpan(tournamentStats,2);page.Controls.Add(p);
+        var save=Btn("Сохранить данные турнира",(s,e)=>{db.SaveTournament(tName.Text,tPlace.Text,tStart.Text,tEnd.Text,(int)tMats.Value,tChiefRef.Text,tChiefSec.Text);AutoBackup();MessageBox.Show("Данные турнира сохранены.");ReloadAll();});
+        var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true};
+        buttons.Controls.Add(save);buttons.Controls.Add(Btn("Новый турнир",NewTournamentClick));
+        p.Controls.Add(buttons,1,p.RowCount);int rr=p.RowCount++;p.Controls.Add(tournamentStats,0,rr);p.SetColumnSpan(tournamentStats,2);page.Controls.Add(p);
     }
     void ReloadDashboard(){
         var athletes=db.Athletes();var cats=db.Categories();var bouts=cats.SelectMany(x=>db.Bouts(x.Id)).ToList();
         tournamentStats.Text=$"Участников: {athletes.Count}    Допущено: {athletes.Count(x=>x.Status=="Допущен")}    Взвешено: {athletes.Count(x=>x.ActualWeight.HasValue)}\n"+
             $"Категорий: {cats.Count}    Жеребьёвок утверждено: {cats.Count(x=>x.DrawApproved)}    Поединков: {bouts.Count(x=>x.Status=="Завершён")}/{bouts.Count}    Ковров: {(int)tMats.Value}";
     }
+    void NewTournamentClick(object? s,EventArgs e){
+        var ans=MessageBox.Show("Текущий турнир будет сохранён в архив, после чего рабочая база будет очищена. Создать новый турнир?","Новый турнир",MessageBoxButtons.YesNo,MessageBoxIcon.Warning);
+        if(ans!=DialogResult.Yes)return;
+        try{
+            var t=db.GetTournament();var dir=Path.Combine(root,"TournamentArchive");Directory.CreateDirectory(dir);
+            string raw=string.IsNullOrWhiteSpace(t.Name)?"Tournament":t.Name;
+            var invalid=Path.GetInvalidFileNameChars();var safe=new string(raw.Select(ch=>invalid.Contains(ch)?'_':ch).ToArray());
+            var archive=Path.Combine(dir,$"{safe}_{DateTime.Now:yyyyMMdd_HHmmss}.db");File.Copy(db.FileName,archive,true);
+            db.ResetForNewTournament();LoadTournament();ReloadAll();MessageBox.Show($"Новый турнир создан.\nАрхив предыдущего: {archive}");
+        }catch(Exception ex){MessageBox.Show(ex.Message,"Ошибка создания нового турнира");}
+    }
+
     static void AddField(TableLayoutPanel p,string label,Control c){int r=p.RowCount++;p.RowStyles.Add(new RowStyle(SizeType.AutoSize));p.Controls.Add(new Label{Text=label,AutoSize=true,Margin=new Padding(3,10,15,3)},0,r);c.Dock=DockStyle.Fill;c.Width=500;p.Controls.Add(c,1,r);}
     void LoadTournament(){var t=db.GetTournament();tName.Text=t.Name;tPlace.Text=t.Place;tStart.Text=t.StartDate;tEnd.Text=t.EndDate;tMats.Value=Math.Clamp(t.Mats,1,12);tChiefRef.Text=t.ChiefReferee;tChiefSec.Text=t.ChiefSecretary;}
 

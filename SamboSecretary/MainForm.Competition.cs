@@ -17,7 +17,7 @@ public sealed partial class MainForm{
         bar.Controls.Add(Btn("Сформировать / пережеребьевать",GenerateDrawClick));
         bar.Controls.Add(Btn("Переставить вручную",(s,e)=>{if(drawMode.Items.Contains("Ручная"))drawMode.SelectedItem="Ручная";GenerateDrawClick(s,e);}));
         bar.Controls.Add(Btn("Утвердить",(s,e)=>{var id=SelectedCategory(drawCategory);if(!id.HasValue)return;if(db.DrawPositions(id.Value).Count<2){MessageBox.Show("Сначала сформируйте и проверьте жеребьёвку.");return;}db.ApproveDraw(id.Value,true);AutoBackup();ReloadAll();}));
-        bar.Controls.Add(Btn("Разблокировать",(s,e)=>{var id=SelectedCategory(drawCategory);if(id.HasValue&&MessageBox.Show("Разблокировать жеребьёвку? Действие будет записано в журнал.","Подтверждение",MessageBoxButtons.YesNo)==DialogResult.Yes){db.ApproveDraw(id.Value,false);ReloadAll();}}));
+        bar.Controls.Add(Btn("Разблокировать",(s,e)=>{var id=SelectedCategory(drawCategory);if(id.HasValue&&MessageBox.Show("Разблокировать жеребьёвку? Действие будет записано в журнал.","Подтверждение",MessageBoxButtons.YesNo)==DialogResult.Yes)UiGuard(()=>{db.ApproveDraw(id.Value,false);ReloadAll();},"Жеребьёвка не разблокирована");}));
         drawCategory.SelectedIndexChanged+=(s,e)=>LoadDrawSettings();
         page.Controls.Add(drawGrid);page.Controls.Add(bar);
     }

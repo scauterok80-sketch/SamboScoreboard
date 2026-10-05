@@ -2,7 +2,7 @@ namespace SamboSecretary;
 
 public sealed partial class MainForm{
     readonly ComboBox judgeAssignmentCategory=new(){DropDownStyle=ComboBoxStyle.DropDownList,Width=340};
-    readonly NumericUpDown judgeAssignmentMat=new(){Minimum=1,Maximum=12,Value=1,Width=70};
+    readonly NumericUpDown judgeAssignmentMat=new(){Minimum=1,Maximum=6,Value=1,Width=70};
     readonly DataGridView judgeAssignmentGrid=Grid();
     readonly Label tournamentStats=new(){AutoSize=true,Font=new Font("Segoe UI",11,FontStyle.Bold),Padding=new Padding(8),Margin=new Padding(3,18,3,3)};
     void BuildTournamentTab(){

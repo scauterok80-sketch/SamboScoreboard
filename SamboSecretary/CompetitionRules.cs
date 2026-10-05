@@ -7,7 +7,7 @@ public record RankingResult(List<long> Ordered,List<List<long>> Unresolved,Dicti
 public static class CompetitionRules{
     public static ClassificationResult ClassificationFor(string resultCode,int redScore,int blueScore,bool redWon,string reason){
         string code=resultCode?.Trim()??"";
-        bool clean=reason is "Чистая победа" or "Болевой приём" or "Явное преимущество" or "Нокаут" or "Два нокдауна" or "Потеря сознания при удушающем";
+        bool clean=reason is "Чистая победа" or "Болевой приём" or "Удушающий приём" or "Явное преимущество" or "Нокаут" or "Два нокдауна" or "Потеря сознания при удушающем";
         if(string.IsNullOrWhiteSpace(code)){
             if(clean||reason.Contains("Дисквали",StringComparison.OrdinalIgnoreCase)||reason.Contains("Снятие врачом",StringComparison.OrdinalIgnoreCase)||reason.Contains("Неявка",StringComparison.OrdinalIgnoreCase)||reason.Contains("Техничес",StringComparison.OrdinalIgnoreCase)) code="4:0";
             else{

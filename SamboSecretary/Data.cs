@@ -122,6 +122,10 @@ public sealed class Database {
         q.Parameters.AddWithValue("$s",system);q.Parameters.AddWithValue("$r",repechage);q.Parameters.AddWithValue("$m",drawMode);
         var id=(long)q.ExecuteScalar()!; Audit($"Добавлена категория {discipline}, {gender}, {age}, {weight}"); return id;
     }
+    public void UpdateCategory(long id,string discipline,string gender,string age,string weight,string system,string repechage,string drawMode){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText=@"UPDATE categories SET discipline=$d,gender=$g,age_group=$a,weight_category=$w,system=$s,repechage=$r,draw_mode=$m WHERE id=$id";
+        q.Parameters.AddWithValue("$d",discipline);q.Parameters.AddWithValue("$g",gender);q.Parameters.AddWithValue("$a",age);q.Parameters.AddWithValue("$w",weight);q.Parameters.AddWithValue("$s",system);q.Parameters.AddWithValue("$r",repechage);q.Parameters.AddWithValue("$m",drawMode);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Изменена категория {id}");
+    }
     public void DeleteCategory(long id){ using var c=Open(); using var q=c.CreateCommand(); q.CommandText="DELETE FROM categories WHERE id=$id"; q.Parameters.AddWithValue("$id",id); q.ExecuteNonQuery(); Audit($"Удалена категория {id}"); }
     public void UpdateCategorySettings(long id,string system,string repechage,string drawMode){
         using var c=Open(); using var q=c.CreateCommand(); q.CommandText="UPDATE categories SET system=$s,repechage=$r,draw_mode=$m WHERE id=$id";
@@ -143,6 +147,14 @@ public sealed class Database {
         var id=(long)q.ExecuteScalar()!;Audit("Добавлен спортсмен "+NameNormalizer.Normalize(fullName));return id;
     }
 
+    public void UpdateAthlete(long id,string fullName,string birth,string gender,string region,string organization,string team,string coach,string rank,string discipline,string age,string weight,double? declaredWeight,long? categoryId){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText=@"UPDATE athletes SET full_name=$n,birth_date=$b,gender=$g,region=$r,organization=$o,team=$t,coach=$c,rank=$rk,discipline=$d,age_group=$a,weight_category=$w,declared_weight=$dw,category_id=$cid WHERE id=$id";
+        q.Parameters.AddWithValue("$n",NameNormalizer.Normalize(fullName));q.Parameters.AddWithValue("$b",birth);q.Parameters.AddWithValue("$g",gender);q.Parameters.AddWithValue("$r",region);q.Parameters.AddWithValue("$o",organization);q.Parameters.AddWithValue("$t",team);q.Parameters.AddWithValue("$c",coach);q.Parameters.AddWithValue("$rk",rank);q.Parameters.AddWithValue("$d",discipline);q.Parameters.AddWithValue("$a",age);q.Parameters.AddWithValue("$w",weight);q.Parameters.AddWithValue("$dw",(object?)declaredWeight??DBNull.Value);q.Parameters.AddWithValue("$cid",(object?)categoryId??DBNull.Value);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Изменена карточка спортсмена {id}");
+    }
+    public bool DeleteAthleteIfUnused(long id){
+        using var c=Open();using(var q=c.CreateCommand()){q.CommandText="SELECT COUNT(*) FROM bouts WHERE red_id=$id OR blue_id=$id OR winner_id=$id";q.Parameters.AddWithValue("$id",id);if(Convert.ToInt32(q.ExecuteScalar())>0)return false;}
+        using(var q=c.CreateCommand()){q.CommandText="DELETE FROM athletes WHERE id=$id";q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();}Audit($"Удалён спортсмен {id}");return true;
+    }
     public void UpdateAthleteStatus(long id,string status){using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET status=$s WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Статус спортсмена {id}: {status}");}
     public void SetWeigh(long id,double kg,string status="Допущен"){using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET actual_weight=$w,status=$s WHERE id=$id";q.Parameters.AddWithValue("$w",kg);q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Взвешивание {id}: {kg} кг, {status}");}
     public void AssignCategory(long id,long? categoryId){using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET category_id=$c WHERE id=$id";q.Parameters.AddWithValue("$c",(object?)categoryId??DBNull.Value);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();}
@@ -161,6 +173,12 @@ public sealed class Database {
         using var c=Open();using var q=c.CreateCommand();q.CommandText="INSERT INTO judges(name,region,category,role) VALUES($n,$r,$c,$o);SELECT last_insert_rowid();";
         q.Parameters.AddWithValue("$n",NameNormalizer.Normalize(name));q.Parameters.AddWithValue("$r",region);q.Parameters.AddWithValue("$c",category);q.Parameters.AddWithValue("$o",role);
         var id=(long)q.ExecuteScalar()!;Audit("Добавлен судья "+NameNormalizer.Normalize(name));return id;
+    }
+    public bool DeleteJudge(long id){
+        using var c=Open();using var tx=c.BeginTransaction();
+        using(var q=c.CreateCommand()){q.Transaction=tx;q.CommandText="DELETE FROM judge_assignments WHERE judge_id=$id";q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();}
+        int n;using(var q=c.CreateCommand()){q.Transaction=tx;q.CommandText="DELETE FROM judges WHERE id=$id";q.Parameters.AddWithValue("$id",id);n=q.ExecuteNonQuery();}
+        tx.Commit();if(n>0)Audit($"Удалён судья {id}");return n>0;
     }
     public List<JudgeRow> Judges(){using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT id,name,COALESCE(region,''),COALESCE(category,''),COALESCE(role,'') FROM judges ORDER BY name";using var r=q.ExecuteReader();var x=new List<JudgeRow>();while(r.Read())x.Add(new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4)));return x;}
     public void AssignJudge(long categoryId,long judgeId,int mat,string role){

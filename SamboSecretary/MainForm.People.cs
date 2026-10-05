@@ -68,10 +68,15 @@ public sealed partial class MainForm{
             string M(string field)=>m.TryGetValue(field,out var h)?h:"";
             string V(Dictionary<string,string> r,string field)=>ExcelImporter.Value(r,M(field));
             var parsed=new List<(Dictionary<string,string> Row,string Name)>();
+            var invalid=new List<string>();
+            int rowNo=1;
             foreach(var row in data.Rows){
-                var whole=V(row,"ФИО");
-                var name=whole!=""?NameNormalizer.Normalize(whole):NameNormalizer.Normalize(V(row,"Фамилия"),V(row,"Имя"),V(row,"Отчество"));
-                if(name!="")parsed.Add((row,name));
+                rowNo++;
+                var whole=V(row,"ФИО");string name,error;bool ok;
+                if(whole!="")ok=NameNormalizer.TryNormalizeImported(out name,out error,whole);
+                else ok=NameNormalizer.TryNormalizeImported(out name,out error,V(row,"Фамилия"),V(row,"Имя"),V(row,"Отчество"));
+                if(ok)parsed.Add((row,name));
+                else invalid.Add($"строка {rowNo}: {error}");
             }
             var existing=db.Athletes().Select(a=>a.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
             int dup=parsed.Count(x=>existing.Contains(x.Name));bool importDup=false;
@@ -88,7 +93,8 @@ public sealed partial class MainForm{
                 db.AddAthlete(item.Name,V(row,"Дата рождения"),gender,V(row,"Регион"),V(row,"Организация"),V(row,"Команда"),V(row,"Тренер"),V(row,"Разряд"),discipline,age,weight,ParseDouble(V(row,"Заявленный вес")),cid);
                 added++;
             }
-            MessageBox.Show($"Импорт завершён.\nДобавлено: {added}\nПропущено совпадений: {skipped}");ReloadAll();
+            var bad=invalid.Count==0?"":$"\nОшибочных/неоднозначных строк: {invalid.Count}\n"+string.Join("\n",invalid.Take(10))+(invalid.Count>10?"\n...":"");
+            MessageBox.Show($"Импорт завершён.\nДобавлено: {added}\nПропущено совпадений: {skipped}{bad}");db.Audit($"Импорт Excel: добавлено {added}, дубликатов пропущено {skipped}, неоднозначных строк {invalid.Count}");AutoBackup();ReloadAll();
         }catch(Exception ex){MessageBox.Show(ex.Message,"Ошибка импорта",MessageBoxButtons.OK,MessageBoxIcon.Error);}
     }
 

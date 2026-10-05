@@ -8,6 +8,8 @@ public record CategoryRow(long Id,string Discipline,string Gender,string AgeGrou
 public record Athlete(long Id,string FullName,string BirthDate,string Gender,string Region,string Organization,string Team,string Coach,string Rank,string Discipline,string AgeGroup,string WeightCategory,double? DeclaredWeight,double? ActualWeight,string Status,long? CategoryId);
 public record JudgeRow(long Id,string Name,string Region,string Category,string Role);
 public record BoutRow(long Id,long CategoryId,int BoutNo,string Stage,long? RedId,string RedName,long? BlueId,string BlueName,int Mat,string Status,int? RedScore,int? BlueScore,long? WinnerId,string WinnerName,string Reason,string Judges);
+public record BoutRuleRow(long Id,long CategoryId,int BoutNo,string Stage,long? RedId,long? BlueId,string Status,int RedScore,int BlueScore,long? WinnerId,string ResultCode,int RedClass,int BlueClass,int DurationSeconds,bool IsClean,string Reason);
+public record PlacementRow(long AthleteId,string Athlete,string Team,string Region,int Place,string Source);
 
 public sealed class Database {
     public string FileName { get; }
@@ -41,9 +43,13 @@ public sealed class Database {
             red_id INTEGER,blue_id INTEGER,mat INTEGER DEFAULT 1,status TEXT DEFAULT 'Ожидает',
             red_score INTEGER,blue_score INTEGER,winner_id INTEGER,reason TEXT,judges TEXT DEFAULT '');
 
+        CREATE TABLE IF NOT EXISTS placements(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,category_id INTEGER NOT NULL,athlete_id INTEGER NOT NULL,place INTEGER NOT NULL,source TEXT DEFAULT '');
+
         CREATE TABLE IF NOT EXISTS audit(
             id INTEGER PRIMARY KEY AUTOINCREMENT,ts TEXT NOT NULL,action TEXT NOT NULL);");
         EnsureAthleteColumns(c);
+        EnsureBoutColumns(c);
     }
 
     void EnsureAthleteColumns(SqliteConnection c){
@@ -54,6 +60,15 @@ public sealed class Database {
         var existing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         using(var q=c.CreateCommand()){ q.CommandText="PRAGMA table_info(athletes)"; using var r=q.ExecuteReader(); while(r.Read()) existing.Add(r.GetString(1)); }
         foreach(var kv in required) if(!existing.Contains(kv.Key)) Exec(c,$"ALTER TABLE athletes ADD COLUMN {kv.Key} {kv.Value}");
+    }
+    void EnsureBoutColumns(SqliteConnection c){
+        var required=new Dictionary<string,string>{
+            ["result_code"]="TEXT DEFAULT ''",["red_class"]="INTEGER DEFAULT 0",["blue_class"]="INTEGER DEFAULT 0",
+            ["duration_seconds"]="INTEGER DEFAULT 0",["is_clean"]="INTEGER DEFAULT 0"
+        };
+        var existing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using(var q=c.CreateCommand()){q.CommandText="PRAGMA table_info(bouts)";using var r=q.ExecuteReader();while(r.Read())existing.Add(r.GetString(1));}
+        foreach(var kv in required)if(!existing.Contains(kv.Key))Exec(c,$"ALTER TABLE bouts ADD COLUMN {kv.Key} {kv.Value}");
     }
 
     public void Audit(string s){
@@ -144,9 +159,19 @@ public sealed class Database {
     public void SetBoutStatus(long boutId,string status,int mat){
         using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE bouts SET status=$s,mat=$m WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$m",mat);q.Parameters.AddWithValue("$id",boutId);q.ExecuteNonQuery();Audit($"Поединок {boutId}: статус {status}, ковёр {mat}");
     }
+    public void SetBoutResult(long boutId,int redScore,int blueScore,long winnerId,string reason,string judges,string resultCode,int redClass,int blueClass,int durationSeconds,bool isClean){
+        using var c=Open();
+        string old="";
+        using(var oldq=c.CreateCommand()){oldq.CommandText="SELECT COALESCE(red_score,''),COALESCE(blue_score,''),COALESCE(winner_id,''),COALESCE(reason,''),COALESCE(result_code,'') FROM bouts WHERE id=$id";oldq.Parameters.AddWithValue("$id",boutId);using var r=oldq.ExecuteReader();if(r.Read())old=$"{r.GetValue(0)}:{r.GetValue(1)} winner={r.GetValue(2)} {r.GetValue(3)} {r.GetValue(4)}";}
+        using var q=c.CreateCommand();q.CommandText=@"UPDATE bouts SET red_score=$rs,blue_score=$bs,winner_id=$w,reason=$r,judges=$j,status='Завершён',
+            result_code=$rc,red_class=$rcl,blue_class=$bcl,duration_seconds=$dur,is_clean=$clean WHERE id=$id";
+        q.Parameters.AddWithValue("$rs",redScore);q.Parameters.AddWithValue("$bs",blueScore);q.Parameters.AddWithValue("$w",winnerId);q.Parameters.AddWithValue("$r",reason);q.Parameters.AddWithValue("$j",judges);
+        q.Parameters.AddWithValue("$rc",resultCode);q.Parameters.AddWithValue("$rcl",redClass);q.Parameters.AddWithValue("$bcl",blueClass);q.Parameters.AddWithValue("$dur",durationSeconds);q.Parameters.AddWithValue("$clean",isClean?1:0);q.Parameters.AddWithValue("$id",boutId);q.ExecuteNonQuery();
+        Audit($"Результат поединка {boutId}: было [{old}], стало [{redScore}:{blueScore} winner={winnerId} {reason} {resultCode}]");
+    }
     public void SetBoutResult(long boutId,int redScore,int blueScore,long winnerId,string reason,string judges){
-        using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE bouts SET red_score=$rs,blue_score=$bs,winner_id=$w,reason=$r,judges=$j,status='Завершён' WHERE id=$id";
-        q.Parameters.AddWithValue("$rs",redScore);q.Parameters.AddWithValue("$bs",blueScore);q.Parameters.AddWithValue("$w",winnerId);q.Parameters.AddWithValue("$r",reason);q.Parameters.AddWithValue("$j",judges);q.Parameters.AddWithValue("$id",boutId);q.ExecuteNonQuery();Audit($"Внесён результат поединка {boutId}");
+        var b=BoutsByRuleId(boutId);bool red=b.RedId==winnerId;var cp=CompetitionRules.ClassificationFor(resultCode:"",redScore,blueScore,red,reason);
+        SetBoutResult(boutId,redScore,blueScore,winnerId,reason,judges,cp.Code,cp.Red,cp.Blue,0,cp.Clean);
     }
     public List<BoutRow> Bouts(long categoryId){
         using var c=Open();using var q=c.CreateCommand();q.CommandText=@"SELECT b.id,b.category_id,b.bout_no,COALESCE(b.stage,''),b.red_id,COALESCE(r.full_name,''),b.blue_id,COALESCE(bl.full_name,''),b.mat,COALESCE(b.status,''),b.red_score,b.blue_score,b.winner_id,COALESCE(w.full_name,''),COALESCE(b.reason,''),COALESCE(b.judges,'')
@@ -154,6 +179,23 @@ public sealed class Database {
         q.Parameters.AddWithValue("$c",categoryId);using var r=q.ExecuteReader();var x=new List<BoutRow>();
         while(r.Read())x.Add(new(r.GetInt64(0),r.GetInt64(1),r.GetInt32(2),r.GetString(3),r.IsDBNull(4)?null:r.GetInt64(4),r.GetString(5),r.IsDBNull(6)?null:r.GetInt64(6),r.GetString(7),r.GetInt32(8),r.GetString(9),r.IsDBNull(10)?null:r.GetInt32(10),r.IsDBNull(11)?null:r.GetInt32(11),r.IsDBNull(12)?null:r.GetInt64(12),r.GetString(13),r.GetString(14),r.GetString(15)));return x;
     }
+    public BoutRuleRow BoutsByRuleId(long boutId){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText=@"SELECT id,category_id,bout_no,COALESCE(stage,''),red_id,blue_id,COALESCE(status,''),COALESCE(red_score,0),COALESCE(blue_score,0),winner_id,COALESCE(result_code,''),COALESCE(red_class,0),COALESCE(blue_class,0),COALESCE(duration_seconds,0),COALESCE(is_clean,0),COALESCE(reason,'') FROM bouts WHERE id=$id";q.Parameters.AddWithValue("$id",boutId);using var r=q.ExecuteReader();if(!r.Read())throw new InvalidOperationException("Поединок не найден");return new(r.GetInt64(0),r.GetInt64(1),r.GetInt32(2),r.GetString(3),r.IsDBNull(4)?null:r.GetInt64(4),r.IsDBNull(5)?null:r.GetInt64(5),r.GetString(6),r.GetInt32(7),r.GetInt32(8),r.IsDBNull(9)?null:r.GetInt64(9),r.GetString(10),r.GetInt32(11),r.GetInt32(12),r.GetInt32(13),r.GetInt32(14)!=0,r.GetString(15));
+    }
+    public List<BoutRuleRow> BoutRules(long categoryId){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText=@"SELECT id,category_id,bout_no,COALESCE(stage,''),red_id,blue_id,COALESCE(status,''),COALESCE(red_score,0),COALESCE(blue_score,0),winner_id,COALESCE(result_code,''),COALESCE(red_class,0),COALESCE(blue_class,0),COALESCE(duration_seconds,0),COALESCE(is_clean,0),COALESCE(reason,'') FROM bouts WHERE category_id=$c ORDER BY bout_no";q.Parameters.AddWithValue("$c",categoryId);using var r=q.ExecuteReader();var x=new List<BoutRuleRow>();while(r.Read())x.Add(new(r.GetInt64(0),r.GetInt64(1),r.GetInt32(2),r.GetString(3),r.IsDBNull(4)?null:r.GetInt64(4),r.IsDBNull(5)?null:r.GetInt64(5),r.GetString(6),r.GetInt32(7),r.GetInt32(8),r.IsDBNull(9)?null:r.GetInt64(9),r.GetString(10),r.GetInt32(11),r.GetInt32(12),r.GetInt32(13),r.GetInt32(14)!=0,r.GetString(15)));return x;
+    }
+    public void UpdateBoutParticipants(long boutId,long? red,long? blue){using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE bouts SET red_id=$r,blue_id=$b WHERE id=$id AND status<>'Завершён'";q.Parameters.AddWithValue("$r",(object?)red??DBNull.Value);q.Parameters.AddWithValue("$b",(object?)blue??DBNull.Value);q.Parameters.AddWithValue("$id",boutId);q.ExecuteNonQuery();}
+    public void ReplaceFutureParticipant(long categoryId,long oldId,long newId,int afterBoutNo){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText=@"UPDATE bouts SET red_id=CASE WHEN red_id=$old THEN $new ELSE red_id END,blue_id=CASE WHEN blue_id=$old THEN $new ELSE blue_id END WHERE category_id=$c AND bout_no>$n AND status<>'Завершён' AND (red_id=$old OR blue_id=$old)";
+        q.Parameters.AddWithValue("$old",oldId);q.Parameters.AddWithValue("$new",newId);q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$n",afterBoutNo);q.ExecuteNonQuery();
+    }
+    public bool HasCompletedFutureDependency(long categoryId,long athleteId,int afterBoutNo){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT COUNT(*) FROM bouts WHERE category_id=$c AND bout_no>$n AND status='Завершён' AND (red_id=$a OR blue_id=$a)";q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$n",afterBoutNo);q.Parameters.AddWithValue("$a",athleteId);return Convert.ToInt32(q.ExecuteScalar())>0;
+    }
+    public void ClearPlacements(long categoryId){using var c=Open();using var q=c.CreateCommand();q.CommandText="DELETE FROM placements WHERE category_id=$c";q.Parameters.AddWithValue("$c",categoryId);q.ExecuteNonQuery();}
+    public void SavePlacement(long categoryId,long athleteId,int place,string source){using var c=Open();using var q=c.CreateCommand();q.CommandText="INSERT INTO placements(category_id,athlete_id,place,source) VALUES($c,$a,$p,$s)";q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$a",athleteId);q.Parameters.AddWithValue("$p",place);q.Parameters.AddWithValue("$s",source);q.ExecuteNonQuery();}
+    public List<PlacementRow> Placements(long categoryId){using var c=Open();using var q=c.CreateCommand();q.CommandText=@"SELECT p.athlete_id,a.full_name,COALESCE(a.team,''),COALESCE(a.region,''),p.place,COALESCE(p.source,'') FROM placements p JOIN athletes a ON a.id=p.athlete_id WHERE p.category_id=$c ORDER BY p.place,a.full_name";q.Parameters.AddWithValue("$c",categoryId);using var r=q.ExecuteReader();var x=new List<PlacementRow>();while(r.Read())x.Add(new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetInt32(4),r.GetString(5)));return x;}
 }
 
 public static class ExcelImporter {

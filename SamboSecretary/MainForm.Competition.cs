@@ -219,6 +219,7 @@ public sealed partial class MainForm{
     IEnumerable<string> JudgeLines()=>HeaderLines().Concat(db.Judges().Select((j,i)=>$"{i+1}. {j.Name} | {j.Region} | {j.Category} | {j.Role}"));
     IEnumerable<string> CategoryLines(long cid){
         var c=db.Categories().First(x=>x.Id==cid);var lines=new List<string>();lines.AddRange(HeaderLines());lines.Add($"{c.Discipline}; {c.Gender}; {c.AgeGroup}; {c.WeightCategory}; система: {c.System}; утешительные: {c.Repechage}");lines.Add("");
+        var assignments=db.JudgeAssignments(cid);if(assignments.Count>0){lines.Add("СУДЕЙСКИЕ НАЗНАЧЕНИЯ:");lines.AddRange(assignments.Select(x=>$"Ковёр {x.Mat}: {x.Role} — {x.JudgeName}"));lines.Add("");}
         lines.Add("ЖЕРЕБЬЁВКА:");lines.AddRange(db.DrawPositions(cid).Select(x=>$"{x.Position}. {(x.Athlete==""?"СВОБОДНО":x.Athlete)} {(x.Group!=""?$"[{x.Group}]":"")}"));lines.Add("");lines.Add("ПОЕДИНКИ:");
         var rules=db.BoutRules(cid).ToDictionary(x=>x.Id);
         foreach(var b in db.Bouts(cid)){

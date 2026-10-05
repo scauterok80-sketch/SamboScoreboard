@@ -8,7 +8,7 @@ public sealed partial class MainForm:Form{
     readonly TabControl tabs=new(){Dock=DockStyle.Fill};
 
     readonly TextBox tName=new(),tPlace=new(),tStart=new(),tEnd=new(),tChiefRef=new(),tChiefSec=new(),tTeamScheme=new(){Text="7,5,3,1"};
-    readonly NumericUpDown tMats=new(){Minimum=1,Maximum=12,Value=1};
+    readonly NumericUpDown tMats=new(){Minimum=1,Maximum=6,Value=1};
 
     readonly DataGridView categoryGrid=Grid();
     readonly DataGridView athleteGrid=Grid();

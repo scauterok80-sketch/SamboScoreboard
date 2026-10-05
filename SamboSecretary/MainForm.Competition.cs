@@ -69,8 +69,13 @@ public sealed partial class MainForm{
     }
 
     void GenerateMixed(long cid,List<Athlete> athletes){
-        List<Athlete> order;try{order=OrderedAthletes(athletes,athletes.Count);}catch(OperationCanceledException){return;}
-        var sizes=TournamentEngine.MixedGroups(order.Count);var a=order.Take(sizes.A).ToList();var b=order.Skip(sizes.A).ToList();int pos=1;
+        var sizes=TournamentEngine.MixedGroups(athletes.Count);List<Athlete> order;
+        if(separateTeams.Checked&&drawMode.Text=="Полностью автоматическая")order=SeparateMixedOrder(athletes,sizes.A,sizes.B);
+        else{
+            try{order=OrderedAthletes(athletes,athletes.Count);}catch(OperationCanceledException){return;}
+            if(separateTeams.Checked&&drawMode.Text!="Полностью автоматическая")db.Audit($"Разведение команд в смешанной категории {cid}: ручные/сеяные позиции имеют приоритет");
+        }
+        var a=order.Take(sizes.A).ToList();var b=order.Skip(sizes.A).ToList();int pos=1;
         foreach(var x in a)db.AddDrawPosition(cid,pos++,x.Id,"A");foreach(var x in b)db.AddDrawPosition(cid,pos++,x.Id,"B");
         int no=1,mat=1;
         foreach(var bt in TournamentEngine.RoundRobin(a.Select(x=>x.Id).ToList())){db.AddBout(cid,no++,$"Группа A / {bt.Stage}",bt.Red,bt.Blue,mat);mat=mat%(int)tMats.Value+1;}
@@ -82,7 +87,9 @@ public sealed partial class MainForm{
         if(drawMode.Text!="Полностью автоматическая"){
             using var d=new DrawPositionDialog(athletes,size,drawMode.Text=="Ручная");if(d.ShowDialog(this)!=DialogResult.OK)return;fixedPos=d.Positions;
         }
-        var slots=TournamentEngine.Draw(athletes.Select(a=>a.Id).ToList(),size,drawMode.Text=="Ручная"?DrawMode.Manual:drawMode.Text.StartsWith("Посев")?DrawMode.SeededAuto:DrawMode.FullAuto,fixedPos);
+        var slots=separateTeams.Checked&&drawMode.Text!="Ручная"
+            ?BuildSeparatedOlympicSlots(athletes,size,fixedPos)
+            :TournamentEngine.Draw(athletes.Select(a=>a.Id).ToList(),size,drawMode.Text=="Ручная"?DrawMode.Manual:drawMode.Text.StartsWith("Посев")?DrawMode.SeededAuto:DrawMode.FullAuto,fixedPos);
         if(drawMode.Text=="Ручная"&&fixedPos!=null){slots=Enumerable.Repeat<long?>(null,size).ToList();foreach(var kv in fixedPos)slots[kv.Value-1]=kv.Key;}
         for(int i=0;i<size;i++)db.AddDrawPosition(cid,i+1,slots[i],"Сетка");
         string stage=size==8?"1/4":size==16?"1/8":"1/16";int no=1,mat=1;

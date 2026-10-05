@@ -6,7 +6,7 @@ namespace SamboSecretary;
 public record Tournament(long Id,string Name,string Place,string StartDate,string EndDate,int Mats,string ChiefReferee,string ChiefSecretary,string TeamScheme);
 public record CategoryRow(long Id,string Discipline,string Gender,string AgeGroup,string WeightCategory,string System,string Repechage,string DrawMode,bool DrawApproved,string Status);
 public record Athlete(long Id,string FullName,string BirthDate,string Gender,string Region,string Organization,string Team,string Coach,string Rank,string Discipline,string AgeGroup,string WeightCategory,double? DeclaredWeight,double? ActualWeight,string Status,long? CategoryId,string StatusReason="");
-public record JudgeRow(long Id,string Name,string Region,string Category,string Role);
+public record JudgeRow(long Id,string Name,string Region,string Category,string Role,string Notes="");
 public record JudgeAssignmentRow(long Id,long CategoryId,long JudgeId,string JudgeName,int Mat,string Role);
 public record BoutRow(long Id,long CategoryId,int BoutNo,int DisplayNo,string Stage,long? RedId,string RedName,long? BlueId,string BlueName,int Mat,string ScheduledTime,string Status,int? RedScore,int? BlueScore,long? WinnerId,string WinnerName,string Reason,string Judges);
 public record BoutRuleRow(long Id,long CategoryId,int BoutNo,string Stage,long? RedId,long? BlueId,string Status,int RedScore,int BlueScore,long? WinnerId,string ResultCode,int RedClass,int BlueClass,int DurationSeconds,bool IsClean,int Red4,int Red2,int Red1,int Blue4,int Blue2,int Blue1,string Reason);
@@ -34,7 +34,7 @@ public sealed class Database {
             discipline TEXT,age_group TEXT,weight_category TEXT,declared_weight REAL,actual_weight REAL,status TEXT DEFAULT 'Заявлен',category_id INTEGER);
 
         CREATE TABLE IF NOT EXISTS judges(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,region TEXT,category TEXT,role TEXT);
+            id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,region TEXT,category TEXT,role TEXT,notes TEXT DEFAULT '');
 
         CREATE TABLE IF NOT EXISTS judge_assignments(
             id INTEGER PRIMARY KEY AUTOINCREMENT,category_id INTEGER NOT NULL,judge_id INTEGER NOT NULL,mat INTEGER DEFAULT 1,role TEXT DEFAULT '',
@@ -55,6 +55,7 @@ public sealed class Database {
             id INTEGER PRIMARY KEY AUTOINCREMENT,ts TEXT NOT NULL,action TEXT NOT NULL);");
         EnsureTournamentColumns(c);
         EnsureAthleteColumns(c);
+        EnsureJudgeColumns(c);
         EnsureBoutColumns(c);
     }
 
@@ -72,6 +73,12 @@ public sealed class Database {
         using(var q=c.CreateCommand()){ q.CommandText="PRAGMA table_info(athletes)"; using var r=q.ExecuteReader(); while(r.Read()) existing.Add(r.GetString(1)); }
         foreach(var kv in required) if(!existing.Contains(kv.Key)) Exec(c,$"ALTER TABLE athletes ADD COLUMN {kv.Key} {kv.Value}");
     }
+    void EnsureJudgeColumns(SqliteConnection c){
+        var existing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using(var q=c.CreateCommand()){q.CommandText="PRAGMA table_info(judges)";using var r=q.ExecuteReader();while(r.Read())existing.Add(r.GetString(1));}
+        if(!existing.Contains("notes"))Exec(c,"ALTER TABLE judges ADD COLUMN notes TEXT DEFAULT ''");
+    }
+
     void EnsureBoutColumns(SqliteConnection c){
         var required=new Dictionary<string,string>{
             ["result_code"]="TEXT DEFAULT ''",["red_class"]="INTEGER DEFAULT 0",["blue_class"]="INTEGER DEFAULT 0",
@@ -205,10 +212,14 @@ public sealed class Database {
         return x;
     }
 
-    public long AddJudge(string name,string region,string category,string role){
-        using var c=Open();using var q=c.CreateCommand();q.CommandText="INSERT INTO judges(name,region,category,role) VALUES($n,$r,$c,$o);SELECT last_insert_rowid();";
-        q.Parameters.AddWithValue("$n",NameNormalizer.Normalize(name));q.Parameters.AddWithValue("$r",region);q.Parameters.AddWithValue("$c",category);q.Parameters.AddWithValue("$o",role);
+    public long AddJudge(string name,string region,string category,string role,string notes=""){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="INSERT INTO judges(name,region,category,role,notes) VALUES($n,$r,$c,$o,$notes);SELECT last_insert_rowid();";
+        q.Parameters.AddWithValue("$n",NameNormalizer.Normalize(name));q.Parameters.AddWithValue("$r",region);q.Parameters.AddWithValue("$c",category);q.Parameters.AddWithValue("$o",role);q.Parameters.AddWithValue("$notes",notes??"");
         var id=(long)q.ExecuteScalar()!;Audit("Добавлен судья "+NameNormalizer.Normalize(name));return id;
+    }
+    public void UpdateJudge(long id,string name,string region,string category,string role,string notes){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE judges SET name=$n,region=$r,category=$c,role=$o,notes=$notes WHERE id=$id";
+        q.Parameters.AddWithValue("$n",NameNormalizer.Normalize(name));q.Parameters.AddWithValue("$r",region);q.Parameters.AddWithValue("$c",category);q.Parameters.AddWithValue("$o",role);q.Parameters.AddWithValue("$notes",notes??"");q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Изменена карточка судьи {id}");
     }
     public bool DeleteJudge(long id){
         using var c=Open();using var tx=c.BeginTransaction();
@@ -216,7 +227,7 @@ public sealed class Database {
         int n;using(var q=c.CreateCommand()){q.Transaction=tx;q.CommandText="DELETE FROM judges WHERE id=$id";q.Parameters.AddWithValue("$id",id);n=q.ExecuteNonQuery();}
         tx.Commit();if(n>0)Audit($"Удалён судья {id}");return n>0;
     }
-    public List<JudgeRow> Judges(){using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT id,name,COALESCE(region,''),COALESCE(category,''),COALESCE(role,'') FROM judges ORDER BY name";using var r=q.ExecuteReader();var x=new List<JudgeRow>();while(r.Read())x.Add(new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4)));return x;}
+    public List<JudgeRow> Judges(){using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT id,name,COALESCE(region,''),COALESCE(category,''),COALESCE(role,''),COALESCE(notes,'') FROM judges ORDER BY name";using var r=q.ExecuteReader();var x=new List<JudgeRow>();while(r.Read())x.Add(new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4),r.GetString(5)));return x;}
     public void AssignJudge(long categoryId,long judgeId,int mat,string role){
         if(mat<1||mat>6)throw new ArgumentOutOfRangeException(nameof(mat),"Номер ковра должен быть от 1 до 6.");
         using var c=Open();using var q=c.CreateCommand();q.CommandText="INSERT OR IGNORE INTO judge_assignments(category_id,judge_id,mat,role) VALUES($c,$j,$m,$r)";

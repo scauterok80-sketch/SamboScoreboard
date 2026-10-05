@@ -109,6 +109,7 @@ public sealed class Database {
         tx.Commit();Audit("Создан новый турнир");
     }
     public void SaveTournament(string name,string place,string start,string end,int mats,string chiefReferee,string chiefSecretary,string teamScheme="7,5,3,1"){
+        if(mats<1||mats>6)throw new ArgumentOutOfRangeException(nameof(mats),"Количество ковров должно быть от 1 до 6.");
         using var c=Open(); using var q=c.CreateCommand();
         q.CommandText=@"UPDATE tournament SET name=$n,place=$p,start_date=$s,end_date=$e,mats=$m,chief_referee=$cr,chief_secretary=$cs,team_scheme=$ts WHERE id=1";
         q.Parameters.AddWithValue("$n",name); q.Parameters.AddWithValue("$p",place); q.Parameters.AddWithValue("$s",start); q.Parameters.AddWithValue("$e",end);
@@ -217,6 +218,7 @@ public sealed class Database {
     }
     public List<JudgeRow> Judges(){using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT id,name,COALESCE(region,''),COALESCE(category,''),COALESCE(role,'') FROM judges ORDER BY name";using var r=q.ExecuteReader();var x=new List<JudgeRow>();while(r.Read())x.Add(new(r.GetInt64(0),r.GetString(1),r.GetString(2),r.GetString(3),r.GetString(4)));return x;}
     public void AssignJudge(long categoryId,long judgeId,int mat,string role){
+        if(mat<1||mat>6)throw new ArgumentOutOfRangeException(nameof(mat),"Номер ковра должен быть от 1 до 6.");
         using var c=Open();using var q=c.CreateCommand();q.CommandText="INSERT OR IGNORE INTO judge_assignments(category_id,judge_id,mat,role) VALUES($c,$j,$m,$r)";
         q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$j",judgeId);q.Parameters.AddWithValue("$m",mat);q.Parameters.AddWithValue("$r",role);q.ExecuteNonQuery();Audit($"Назначен судья {judgeId} в категорию {categoryId}, ковёр {mat}, роль {role}");
     }
@@ -238,10 +240,12 @@ public sealed class Database {
         using var q=c.CreateCommand();q.CommandText="DELETE FROM bouts WHERE category_id=$c";q.Parameters.AddWithValue("$c",categoryId);q.ExecuteNonQuery();
     }
     public long AddBout(long categoryId,int no,string stage,long? red,long? blue,int mat=1){
+        if(mat<1||mat>6)throw new ArgumentOutOfRangeException(nameof(mat),"Номер ковра должен быть от 1 до 6.");
         using var c=Open();using var q=c.CreateCommand();q.CommandText=@"INSERT INTO bouts(category_id,bout_no,display_no,stage,red_id,blue_id,mat,status,scheduled_time) VALUES($c,$n,$n,$s,$r,$b,$m,'Ожидает','');SELECT last_insert_rowid();";
         q.Parameters.AddWithValue("$c",categoryId);q.Parameters.AddWithValue("$n",no);q.Parameters.AddWithValue("$s",stage);q.Parameters.AddWithValue("$r",(object?)red??DBNull.Value);q.Parameters.AddWithValue("$b",(object?)blue??DBNull.Value);q.Parameters.AddWithValue("$m",mat);return (long)q.ExecuteScalar()!;
     }
     public void SetBoutStatus(long boutId,string status,int mat,string scheduledTime="",int? displayNo=null){
+        if(mat<1||mat>6)throw new ArgumentOutOfRangeException(nameof(mat),"Номер ковра должен быть от 1 до 6.");
         using var c=Open();
         if(status=="Завершён")throw new InvalidOperationException("Статус «Завершён» устанавливается только после внесения результата поединка.");
         if(status=="Идёт"){using var chk=c.CreateCommand();chk.CommandText="SELECT COUNT(*) FROM bouts WHERE id<>$id AND mat=$m AND status='Идёт'";chk.Parameters.AddWithValue("$id",boutId);chk.Parameters.AddWithValue("$m",mat);if(Convert.ToInt32(chk.ExecuteScalar())>0)throw new InvalidOperationException($"На ковре {mat} уже есть поединок со статусом «Идёт».");}

@@ -102,6 +102,30 @@ public static class CompetitionRules{
         return new(id,classPoints,wins,mutualWins,mutualClass,cleanWins,cleanWinSeconds,nonClean40,win30,win31,win20,lossClass,cleanLosses,cleanLossSeconds,tech4,tech2,tech1,tech,diff);
     }
 
+
+    public static Dictionary<long,int> ConsolationLossDepth(IEnumerable<BoutRuleRow> bouts){
+        var completed=bouts.Where(b=>b.Status=="Завершён"&&b.WinnerId.HasValue&&b.RedId.HasValue&&b.BlueId.HasValue&&b.Stage.StartsWith("Утешение",StringComparison.OrdinalIgnoreCase)).ToList();
+        var maxStep=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
+        foreach(var b in completed){
+            var m=System.Text.RegularExpressions.Regex.Match(b.Stage,@"^(Утешение\s+(?:Ф|ПФ)-[^/]+\s*/).*?шаг\s*(\d+)",System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if(!m.Success)continue;var prefix=m.Groups[1].Value.Trim();int step=int.Parse(m.Groups[2].Value);
+            if(!maxStep.TryGetValue(prefix,out var old)||step>old)maxStep[prefix]=step;
+        }
+        var result=new Dictionary<long,int>();
+        foreach(var b in completed){
+            long loser=b.RedId==b.WinnerId?b.BlueId!.Value:b.RedId!.Value;int depth;
+            if(b.Stage.StartsWith("Утешение группа",StringComparison.OrdinalIgnoreCase))depth=1;
+            else{
+                var m=System.Text.RegularExpressions.Regex.Match(b.Stage,@"^(Утешение\s+(?:Ф|ПФ)-[^/]+\s*/).*?шаг\s*(\d+)",System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if(!m.Success)continue;var prefix=m.Groups[1].Value.Trim();int step=int.Parse(m.Groups[2].Value);int max=maxStep[prefix];
+                bool semiSource=prefix.Contains("ПФ-",StringComparison.OrdinalIgnoreCase);
+                depth=(max-step)+1+(semiSource?1:0);
+            }
+            if(!result.TryGetValue(loser,out var oldDepth)||depth<oldDepth)result[loser]=depth;
+        }
+        return result;
+    }
+
     public static int StageOrder(string stage){
         if(stage.Contains("1/32"))return 1;if(stage.Contains("1/16"))return 2;if(stage.Contains("1/8"))return 3;if(stage.Contains("1/4"))return 4;if(stage.Contains("Полуфинал"))return 5;if(stage=="Финал")return 6;
         return 0;

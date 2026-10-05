@@ -253,7 +253,7 @@ public sealed partial class MainForm{
         page.Controls.Add(p);
     }
 
-    IEnumerable<string> HeaderLines(){var t=db.GetTournament();yield return t.Name;yield return $"Место: {t.Place}";yield return $"Даты: {t.StartDate} — {t.EndDate}";yield return $"Главный судья: {t.ChiefReferee}    Главный секретарь: {t.ChiefSecretary}";yield return "";}
+    IEnumerable<string> HeaderLines(){var t=db.GetTournament();if(!string.IsNullOrWhiteSpace(t.ProtocolHeader))yield return t.ProtocolHeader;yield return t.Name;yield return $"Место: {t.Place}";yield return $"Даты: {t.StartDate} — {t.EndDate}";yield return $"Главный судья: {t.ChiefReferee}    Главный секретарь: {t.ChiefSecretary}";yield return "";}
     IEnumerable<string> ParticipantLines()=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | {a.Region} | {a.Team} | {a.Discipline} | {a.AgeGroup} | {a.WeightCategory} | {a.Status}"));
     IEnumerable<string> CredentialLines()=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | {a.BirthDate} | {a.Region} | {a.Organization} | {a.Discipline} | {a.AgeGroup} | {a.WeightCategory} | статус: {a.Status} | причина: {a.StatusReason}"));
     IEnumerable<string> WeighLines(bool filled)=>HeaderLines().Concat(db.Athletes().Select((a,i)=>$"{i+1}. {a.FullName} | категория {a.WeightCategory} | заявл. {a.DeclaredWeight?.ToString()??"___"} | факт. {(filled?a.ActualWeight?.ToString()??"___":"___")} | {(filled?a.Status:"________")} | причина {(filled?a.StatusReason:"________")}"));
@@ -281,7 +281,7 @@ public sealed partial class MainForm{
     }
 
     void PrintLines(string title,IEnumerable<string> source){
-        var lines=source.ToList();int index=0;
+        var lines=source.ToList();var template=db.GetTournament();if(!string.IsNullOrWhiteSpace(template.ProtocolFooter)){lines.Add("");lines.Add(template.ProtocolFooter);}int index=0;
         try{
             var dir=Path.Combine(root,"Protocols");Directory.CreateDirectory(dir);
             var invalid=Path.GetInvalidFileNameChars();var safe=new string(title.Select(ch=>invalid.Contains(ch)?'_':ch).ToArray());

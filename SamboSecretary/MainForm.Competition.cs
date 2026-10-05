@@ -122,7 +122,8 @@ public sealed partial class MainForm{
         var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue)return;
         var b=db.Bouts(cid.Value).FirstOrDefault(x=>x.Id==bid.Value);if(b==null||!b.RedId.HasValue||!b.BlueId.HasValue)return;
         var oldRule=db.BoutsByRuleId(b.Id);
-        string def=string.Join("; ",db.Judges().Where(j=>j.Role is "Руководитель ковра" or "Арбитр" or "Боковой судья").Take(3).Select(j=>j.Name));
+        var assigned=db.JudgeAssignments(cid.Value).Where(x=>x.Mat==b.Mat).ToList();
+        string def=assigned.Count>0?string.Join("; ",assigned.Select(x=>$"{x.Role}: {x.JudgeName}")):string.Join("; ",db.Judges().Where(j=>j.Role is "Руководитель ковра" or "Арбитр" or "Боковой судья").Take(3).Select(j=>$"{j.Role}: {j.Name}"));
         using var d=new ResultDialog(b.RedName,b.BlueName,def);if(d.ShowDialog(this)!=DialogResult.OK)return;
         long winner=d.Winner.SelectedIndex==0?b.RedId.Value:b.BlueId.Value;
         bool changingWinner=oldRule.Status=="Завершён"&&oldRule.WinnerId.HasValue&&oldRule.WinnerId.Value!=winner;

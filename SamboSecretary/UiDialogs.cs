@@ -79,7 +79,7 @@ public sealed class ImportMappingDialog:Form{
             int col=(i%2)*2,row=i/2;p.Controls.Add(new Label{Text=f.Label,AutoSize=true,Margin=new Padding(3,8,6,3)},col,row);p.Controls.Add(cb,col+1,row);i++;
         }
         split.Panel1.Controls.Add(p);
-        var grid=new DataGridView{Dock=DockStyle.Fill,ReadOnly=true,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.DisplayedCells,DataSource=rows.Take(20).Select(r=>new System.Dynamic.ExpandoObject()).ToList()};
+        var grid=new DataGridView{Dock=DockStyle.Fill,ReadOnly=true,AllowUserToAddRows=false,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.DisplayedCells};
         grid.Columns.Clear();
         foreach(var h in headers) grid.Columns.Add(h,h);
         foreach(var row in rows.Take(20)){int n=grid.Rows.Add();foreach(DataGridViewColumn c in grid.Columns)grid.Rows[n].Cells[c.Index].Value=row.TryGetValue(c.Name,out var v)?v:"";}

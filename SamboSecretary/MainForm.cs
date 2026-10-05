@@ -41,7 +41,7 @@ public sealed partial class MainForm:Form{
     TabPage Page(string title){var p=new TabPage(title);tabs.TabPages.Add(p);return p;}
 
     void ReloadAll(){
-        ReloadCategories();ReloadAthletes();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadJudgeAssignments();ReloadDraw();ReloadBouts();ReloadMats();ReloadResults();ReloadAudit();
+        ReloadDashboard();ReloadCategories();ReloadAthletes();ReloadWeigh();ReloadJudges();ReloadCategoryChoices();ReloadJudgeAssignments();ReloadDraw();ReloadBouts();ReloadMats();ReloadResults();ReloadAudit();
     }
 
     void ReloadCategoryChoices(){

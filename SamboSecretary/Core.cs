@@ -4,6 +4,15 @@ namespace SamboSecretary;
 public enum TournamentSystem { RoundRobin, Mixed, Olympic }
 public enum DrawMode { Manual, SeededAuto, FullAuto }
 public static class NameNormalizer {
+ public static bool TryNormalizeImported(out string normalized,out string error,params string?[] parts){
+  normalized="";error="";var raw=string.Join(" ",parts.Where(x=>!string.IsNullOrWhiteSpace(x))).Trim();
+  if(string.IsNullOrWhiteSpace(raw)){error="пустое ФИО";return false;}
+  if(raw.Any(char.IsDigit)||raw.Contains(',')||raw.Contains(';')){error="неоднозначные символы/разделители";return false;}
+  var words=Regex.Split(raw,@"\s+").Where(x=>x.Length>0).ToArray();
+  if(words.Length<2||words.Length>4){error=$"неоднозначное количество компонентов: {words.Length}";return false;}
+  if(words.Any(w=>w.Length<2)){error="слишком короткий компонент ФИО";return false;}
+  normalized=Normalize(words);return true;
+ }
  public static string Normalize(params string?[] parts) {
   var w=parts.Where(x=>!string.IsNullOrWhiteSpace(x)).SelectMany(x=>Regex.Split(x!.Trim(),@"\s+")).Where(x=>x.Length>0).ToArray();
   if(w.Length==0)return "";

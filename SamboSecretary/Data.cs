@@ -180,6 +180,9 @@ public sealed class Database {
         using(var q=c.CreateCommand()){q.CommandText="DELETE FROM athletes WHERE id=$id";q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();}Audit($"Удалён спортсмен {id}");return true;
     }
     public void UpdateAthleteStatus(long id,string status){using var c=Open();EnsureEligibilityUnlocked(c,id);using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET status=$s WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Статус спортсмена {id}: {status}");}
+    public void SetOperationalAthleteStatus(long id,string status){
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET status=$s WHERE id=$id";q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Соревновательный статус спортсмена {id}: {status}");
+    }
     public void SetWeigh(long id,double kg,string status="Допущен"){using var c=Open();EnsureEligibilityUnlocked(c,id);using var q=c.CreateCommand();q.CommandText="UPDATE athletes SET actual_weight=$w,status=$s WHERE id=$id";q.Parameters.AddWithValue("$w",kg);q.Parameters.AddWithValue("$s",status);q.Parameters.AddWithValue("$id",id);q.ExecuteNonQuery();Audit($"Взвешивание {id}: {kg} кг, {status}");}
     public void AssignCategory(long id,long? categoryId){
         using var c=Open();var old=AthleteCompetitionFields(c,id);

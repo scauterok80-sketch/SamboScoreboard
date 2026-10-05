@@ -1,10 +1,10 @@
 [Setup]
 AppName=Самбо-секретарь
-AppVersion=1.0.0
+AppVersion=2.0.0
 DefaultDirName={autopf}\SamboSecretary
 DefaultGroupName=Самбо-секретарь
 OutputDir=output
-OutputBaseFilename=SamboSecretary_Setup_1.0.0_win64
+OutputBaseFilename=SamboSecretary_Setup_2.0.0_win64
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible

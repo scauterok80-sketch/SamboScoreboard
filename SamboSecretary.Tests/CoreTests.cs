@@ -23,4 +23,18 @@ public void SeededDrawRejectsImpossibleByeLayout(){
  var seeded=new Dictionary<long,int>{{1,1},{2,2},{3,3},{4,4}};
  Assert.Throws<ArgumentException>(()=>TournamentEngine.Draw(ids,16,DrawMode.SeededAuto,seeded,42));
 }
+
+[Fact]
+public void ManualOlympicDrawRejectsByeByePair(){
+ var ids=Enumerable.Range(1,9).Select(x=>(long)x).ToList();
+ var pos=new Dictionary<long,int>{{1,1},{2,2},{3,3},{4,4},{5,5},{6,6},{7,7},{8,8},{9,9}};
+ Assert.Throws<ArgumentException>(()=>TournamentEngine.Draw(ids,16,DrawMode.Manual,pos,42));
+}
+[Fact]
+public void ManualOlympicDrawAcceptsOneAthleteInEveryFirstRoundPair(){
+ var ids=Enumerable.Range(1,9).Select(x=>(long)x).ToList();
+ var pos=new Dictionary<long,int>{{1,1},{2,3},{3,5},{4,7},{5,9},{6,11},{7,13},{8,15},{9,2}};
+ var d=TournamentEngine.Draw(ids,16,DrawMode.Manual,pos,42);
+ for(int i=0;i<16;i+=2)Assert.True(d[i].HasValue||d[i+1].HasValue);
+}
 }

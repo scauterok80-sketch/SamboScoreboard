@@ -14,7 +14,9 @@ public sealed partial class MainForm{
         bar.Controls.Add(new Label{Text="Жеребьёвка:",AutoSize=true,Margin=new Padding(10,12,3,0)});bar.Controls.Add(drawMode);
         bar.Controls.Add(new Label{Text="Утешительные:",AutoSize=true,Margin=new Padding(10,12,3,0)});bar.Controls.Add(drawRepechage);
         bar.Controls.Add(separateTeams);
-        bar.Controls.Add(Btn("Сформировать",GenerateDrawClick));bar.Controls.Add(Btn("Утвердить",(s,e)=>{var id=SelectedCategory(drawCategory);if(id.HasValue){db.ApproveDraw(id.Value,true);ReloadAll();}}));
+        bar.Controls.Add(Btn("Сформировать / пережеребьевать",GenerateDrawClick));
+        bar.Controls.Add(Btn("Переставить вручную",(s,e)=>{if(drawMode.Items.Contains("Ручная"))drawMode.SelectedItem="Ручная";GenerateDrawClick(s,e);}));
+        bar.Controls.Add(Btn("Утвердить",(s,e)=>{var id=SelectedCategory(drawCategory);if(id.HasValue){db.ApproveDraw(id.Value,true);AutoBackup();ReloadAll();}}));
         bar.Controls.Add(Btn("Разблокировать",(s,e)=>{var id=SelectedCategory(drawCategory);if(id.HasValue&&MessageBox.Show("Разблокировать жеребьёвку? Действие будет записано в журнал.","Подтверждение",MessageBoxButtons.YesNo)==DialogResult.Yes){db.ApproveDraw(id.Value,false);ReloadAll();}}));
         drawCategory.SelectedIndexChanged+=(s,e)=>LoadDrawSettings();
         page.Controls.Add(drawGrid);page.Controls.Add(bar);
@@ -47,7 +49,7 @@ public sealed partial class MainForm{
         else if(system=="Смешанная")GenerateMixed(cid.Value,athletes);
         else GenerateOlympic(cid.Value,athletes);
         db.Audit($"Сформирована предварительная жеребьёвка категории {cid.Value}: {system}, {drawMode.Text}");
-        ReloadAll();
+        AutoBackup();ReloadAll();
     }
     static string AutoSystem(int n)=>n<=6?"Круговая":n==7?"Смешанная":"Олимпийская";
 

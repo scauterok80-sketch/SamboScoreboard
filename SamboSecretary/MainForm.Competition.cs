@@ -169,11 +169,23 @@ public sealed partial class MainForm{
         var cp=CompetitionRules.ClassificationFor(requested,(int)d.RedScore.Value,(int)d.BlueScore.Value,redWon,d.Reason.Text);
         db.SetBoutResult(b.Id,(int)d.RedScore.Value,(int)d.BlueScore.Value,winner,d.Reason.Text,d.Judges.Text,cp.Code,cp.Red,cp.Blue,d.DurationSeconds,d.Clean.Checked,
             (int)d.Red4.Value,(int)d.Red2.Value,(int)d.Red1.Value,(int)d.Blue4.Value,(int)d.Blue2.Value,(int)d.Blue1.Value);
+        RefreshOperationalStatus(cid.Value,b.RedId.Value);RefreshOperationalStatus(cid.Value,b.BlueId.Value);
         if(changingWinner&&!db.HasCompletedFutureDependency(cid.Value,oldRule.WinnerId!.Value,b.BoutNo))
             db.ReplaceFutureParticipant(cid.Value,oldRule.WinnerId.Value,winner,b.BoutNo);
         var cat=db.Categories().First(x=>x.Id==cid.Value);
         if(cat.System=="Олимпийская")ProgressOlympicRepechage(cid.Value);
         AutoBackup();ReloadAll();
+    }
+
+    void RefreshOperationalStatus(long cid,long athleteId){
+        var athlete=db.Athletes(cid).FirstOrDefault(a=>a.Id==athleteId);if(athlete==null)return;
+        var losses=db.BoutRules(cid).Where(x=>x.Status=="Завершён"&&(x.RedId==athleteId||x.BlueId==athleteId)&&x.WinnerId!=athleteId).ToList();
+        string? special=null;
+        if(losses.Any(x=>(x.Reason??"").Contains("Дисквали",StringComparison.OrdinalIgnoreCase)))special="Дисквалифицирован";
+        else if(losses.Any(x=>(x.Reason??"").Contains("Снятие врачом",StringComparison.OrdinalIgnoreCase)))special="Снят врачом";
+        else if(losses.Any(x=>(x.Reason??"").Contains("Нокаут",StringComparison.OrdinalIgnoreCase)||(x.Reason??"").Contains("Два нокдауна",StringComparison.OrdinalIgnoreCase)||(x.Reason??"").Contains("Потеря сознания",StringComparison.OrdinalIgnoreCase)))special="Снят после травмирующего исхода";
+        if(special!=null)db.SetOperationalAthleteStatus(athleteId,special);
+        else if(athlete.Status is "Дисквалифицирован" or "Снят врачом" or "Снят после травмирующего исхода")db.SetOperationalAthleteStatus(athleteId,athlete.ActualWeight.HasValue?"Допущен":"Заявлен");
     }
 
     void AdvanceStageClick(object? s,EventArgs e){

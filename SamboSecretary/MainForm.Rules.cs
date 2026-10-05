@@ -213,9 +213,10 @@ public sealed partial class MainForm{
     }
 
     IEnumerable<string> FullProtocolPackageLines(){
-        var lines=new List<string>();lines.AddRange(HeaderLines());lines.Add("=== УЧАСТНИКИ ===");lines.AddRange(ParticipantLines().Skip(5));lines.Add("");lines.Add("=== СУДЬИ ===");lines.AddRange(JudgeLines().Skip(5));
+        int headerCount=HeaderLines().Count();
+        var lines=new List<string>();lines.AddRange(HeaderLines());lines.Add("=== УЧАСТНИКИ ===");lines.AddRange(ParticipantLines().Skip(headerCount));lines.Add("");lines.Add("=== СУДЬИ ===");lines.AddRange(JudgeLines().Skip(headerCount));
         foreach(var c in db.Categories()){lines.Add("");lines.Add("================================================");lines.AddRange(CategoryLines(c.Id));}
-        lines.Add("");lines.Add("=== КОМАНДНЫЙ ЗАЧЁТ ===");lines.AddRange(TeamStandingLines().Skip(5));return lines;
+        lines.Add("");lines.Add("=== КОМАНДНЫЙ ЗАЧЁТ ===");lines.AddRange(TeamStandingLines().Skip(headerCount));return lines;
     }
 
     void AutoBackup(){

@@ -35,6 +35,10 @@ public sealed partial class MainForm{
         var allowed=TournamentEngine.Allowed(athletes.Count);
         var enumSystem=system switch{"Круговая"=>TournamentSystem.RoundRobin,"Смешанная"=>TournamentSystem.Mixed,"Олимпийская"=>TournamentSystem.Olympic,_=>TournamentSystem.RoundRobin};
         if(!allowed.Contains(enumSystem)){MessageBox.Show($"Система «{system}» недоступна для {athletes.Count} участников.");return;}
+        if(system=="Олимпийская"&&drawRepechage.Text=="По положению"){
+            MessageBox.Show("Для олимпийской системы перед жеребьёвкой обязательно выберите конкретный вариант: «От финалистов», «От полуфиналистов» или «Без утешительных встреч».","Требуется Положение соревнования");
+            return;
+        }
         db.UpdateCategorySettings(cid.Value,system,drawRepechage.Text,drawMode.Text);
         db.ClearBouts(cid.Value);db.ClearDrawPositions(cid.Value);
 

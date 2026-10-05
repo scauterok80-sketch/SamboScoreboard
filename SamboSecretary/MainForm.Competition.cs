@@ -93,13 +93,23 @@ public sealed partial class MainForm{
         var page=Page("Поединки");
         var bar=new FlowLayoutPanel{Dock=DockStyle.Top,Height=50,Padding=new Padding(4)};
         bar.Controls.Add(new Label{Text="Категория:",AutoSize=true,Margin=new Padding(6,12,3,0)});bar.Controls.Add(boutCategory);
-        bar.Controls.Add(Btn("Внести результат",EnterResultClick));bar.Controls.Add(Btn("Сформировать следующий этап",AdvanceStageClick));bar.Controls.Add(Btn("Обновить",(s,e)=>ReloadBouts()));
+        bar.Controls.Add(Btn("Статус / ковёр",ChangeBoutStateClick));bar.Controls.Add(Btn("Внести результат",EnterResultClick));bar.Controls.Add(Btn("Сформировать следующий этап",AdvanceStageClick));bar.Controls.Add(Btn("Обновить",(s,e)=>ReloadBouts()));
         boutCategory.SelectedIndexChanged+=(s,e)=>ReloadBouts();page.Controls.Add(boutGrid);page.Controls.Add(bar);
     }
     void ReloadBouts(){
         var id=SelectedCategory(boutCategory);if(!id.HasValue){boutGrid.DataSource=null;return;}
         boutGrid.DataSource=db.Bouts(id.Value).Select(x=>new{ID=x.Id,Номер=x.BoutNo,Этап=x.Stage,Красный=x.RedName,Синий=x.BlueName,Ковер=x.Mat,Статус=x.Status,Счет_красного=x.RedScore,Счет_синего=x.BlueScore,Победитель=x.WinnerName,Причина=x.Reason,Судьи=x.Judges}).ToList();
     }
+    void ChangeBoutStateClick(object? s,EventArgs e){
+        var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue)return;
+        var b=db.Bouts(cid.Value).FirstOrDefault(x=>x.Id==bid.Value);if(b==null)return;
+        var status=Microsoft.VisualBasic.Interaction.InputBox("Статус: Ожидает / Готов / Вызван / Идёт / Завершён","Статус поединка",b.Status);
+        if(string.IsNullOrWhiteSpace(status))return;
+        var matText=Microsoft.VisualBasic.Interaction.InputBox($"Номер ковра (1–{tMats.Value})","Ковёр",b.Mat.ToString());
+        if(!int.TryParse(matText,out var mat)||mat<1||mat>(int)tMats.Value){MessageBox.Show("Некорректный номер ковра.");return;}
+        db.SetBoutStatus(b.Id,status.Trim(),mat);ReloadAll();
+    }
+
     void EnterResultClick(object? s,EventArgs e){
         var cid=SelectedCategory(boutCategory);var bid=SelectedId(boutGrid);if(!cid.HasValue||!bid.HasValue)return;
         var b=db.Bouts(cid.Value).FirstOrDefault(x=>x.Id==bid.Value);if(b==null||!b.RedId.HasValue||!b.BlueId.HasValue)return;

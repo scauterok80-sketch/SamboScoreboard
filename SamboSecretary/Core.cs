@@ -27,7 +27,14 @@ public static class TournamentEngine {
  public static int BracketSize(int n)=>n switch{8=>8,>=9 and <=16=>16,>=17 and <=32=>32,_=>throw new ArgumentOutOfRangeException(nameof(n))};
  public static (int A,int B) MixedGroups(int n)=>n switch{5=>(2,3),6=>(3,3),7=>(3,4),_=>throw new ArgumentOutOfRangeException(nameof(n))};
  public static List<Bout> RoundRobin(IReadOnlyList<long> ids){
-  var a=ids.ToList();if(a.Count%2==1)a.Add(0);int n=a.Count,no=1;var r=new List<Bout>();
+  if(ids.Count<2||ids.Count>6)throw new ArgumentOutOfRangeException(nameof(ids),"Круговая система применяется для 2–6 участников.");
+  // Приложение 2, таблица 1 Правил вида спорта «самбо»: первый круг
+  // начинается с пар 1–2, далее номера располагаются по схеме таблицы.
+  // При нечётном числе участников роль дополнительного номера выполняет 0.
+  int n=ids.Count%2==0?ids.Count:ids.Count+1;
+  var a=new List<long>{ids[0]};
+  for(int position=n;position>=2;position--) a.Add(position==n&&ids.Count%2==1?0:ids[position-1]);
+  int no=1;var r=new List<Bout>();
   for(int round=0;round<n-1;round++){for(int i=0;i<n/2;i++){var x=a[i];var y=a[n-1-i];if(x!=0&&y!=0)r.Add(new(no++,x,y,$"Круг {round+1}"));}var last=a[^1];a.RemoveAt(a.Count-1);a.Insert(1,last);}return r;
  }
  public static List<long?> Draw(IReadOnlyList<long> ids,int size,DrawMode mode,IDictionary<long,int>? seeded=null,int seed=12345){
